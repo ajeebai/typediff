@@ -1,5 +1,5 @@
 {
-  "name": "FluxType: Reactive Diffusion",
+  "name": "Typediff: Reactive Diffusion",
   "description": "A live typography installation where words dissolve into reaction-diffusion patterns, featuring generative audio synthesis and cinematic 3D post-processing.",
   "requestFramePermissions": []
 }

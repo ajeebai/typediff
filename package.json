@@ -1,5 +1,5 @@
 {
-  "name": "fluxtype:-reactive-diffusion",
+  "name": "typediff:-reactive-diffusion",
   "private": true,
   "version": "0.0.0",
   "type": "module",
