@@ -57,9 +57,11 @@ void main() {
     float nextB = b + (0.5 * lapB + a * b * b - (uKill + uFeed) * b) * uDt;
 
     // Text Input Injection
+    // Reduced mix strength (0.1) allows the RD pattern to take over the shape 
+    // rather than being forced into the exact font shape constantly.
     float seed = texture2D(uInput, vUv).r;
     if(seed > 0.1) {
-        nextB = mix(nextB, 0.9, 0.5); // Soft inject
+        nextB = mix(nextB, 0.9, 0.1); 
     }
 
     gl_FragColor = vec4(clamp(nextA, 0.0, 1.0), clamp(nextB, 0.0, 1.0), 0.0, 1.0);
@@ -96,17 +98,22 @@ varying float vDisplacement;
 uniform sampler2D uTexture;
 uniform vec3 uColor1;
 uniform vec3 uColor2;
+uniform vec3 uBackgroundColor;
 
 void main() {
     vec4 data = texture2D(uTexture, vUv);
     float b = data.g;
     
-    // Sharper threshold for cleaner look
-    vec3 col = mix(vec3(0.0), uColor1, smoothstep(0.05, 0.2, b));
+    // Smooth mixing from Background -> Color1 -> Color2
+    // Background color is used where 'b' (chemical B) is low.
+    
+    vec3 col = mix(uBackgroundColor, uColor1, smoothstep(0.05, 0.2, b));
     col = mix(col, uColor2, smoothstep(0.2, 0.5, b));
     
     // Artificial shading based on displacement/concentration
-    col *= smoothstep(0.05, 0.2, b);
+    // Only shade where there is content to avoid darkening the background
+    float shadow = smoothstep(0.05, 0.2, b);
+    col *= mix(1.0, shadow, 0.2); 
     
     // Add a subtle highlight at the top
     float highlight = smoothstep(0.4, 0.6, b);
@@ -247,6 +254,7 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
         uDisplacementScale: { value: config.displacementScale },
         uColor1: { value: new THREE.Color(config.color1) },
         uColor2: { value: new THREE.Color(config.color2) },
+        uBackgroundColor: { value: new THREE.Color(config.backgroundColor) },
       },
       vertexShader: displayVertexShader,
       fragmentShader: displayFragmentShader,
@@ -267,6 +275,7 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
         renderMaterial.uniforms.uDisplacementScale.value = config.displacementScale;
         renderMaterial.uniforms.uColor1.value.set(config.color1);
         renderMaterial.uniforms.uColor2.value.set(config.color2);
+        renderMaterial.uniforms.uBackgroundColor.value.set(config.backgroundColor);
     }
   }, [config, simMaterial, renderMaterial]);
 

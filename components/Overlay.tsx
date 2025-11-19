@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { audioSynth } from '../services/AudioSynth';
 import { AppConfig } from '../types';
@@ -9,13 +8,14 @@ interface SettingsPanelProps {
   setText: (t: string) => void;
 }
 
-// Refined Reaction Diffusion Regimes for optimal visuals
+// Refined Reaction Diffusion Regimes for distinct, alive visuals
 const RD_PRESETS = [
   { name: 'Coral', feed: 0.0545, kill: 0.0620 },
-  { name: 'Mazes', feed: 0.0290, kill: 0.0570 },
   { name: 'Mitosis', feed: 0.0367, kill: 0.0644 },
-  { name: 'Worms', feed: 0.0580, kill: 0.0650 },
-  { name: 'Holes', feed: 0.0340, kill: 0.0560 },
+  { name: 'Mazes', feed: 0.0290, kill: 0.0570 },
+  { name: 'Chaos', feed: 0.0820, kill: 0.0600 },
+  { name: 'Worms', feed: 0.0460, kill: 0.0630 },
+  { name: 'Spots', feed: 0.0250, kill: 0.0600 },
 ];
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, setText }) => {
@@ -93,7 +93,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
               ))}
             </div>
 
-            {/* Fine Tuning - Simplified & Safer Ranges */}
+            {/* Fine Tuning - Ranges expanded to allow for Chaos and Spots */}
             <div className="pt-4 space-y-4 border-t border-white/5 mt-4">
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-[9px] text-cyan-200/70 font-mono">
@@ -102,14 +102,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
                 </div>
                 <input 
                   type="range" 
-                  min="0.0180" 
-                  max="0.0620" 
+                  min="0.0100" 
+                  max="0.1000" 
                   step="0.0001"
                   value={config.feed}
                   onChange={(e) => updateConfig('feed', parseFloat(e.target.value))}
                   className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
                 />
-                <p className="text-[8px] text-white/20 leading-tight">Controls how fast the pattern expands into empty space.</p>
+                <p className="text-[8px] text-white/20 leading-tight">Controls expanding waves. Low = Spots, High = Chaos.</p>
               </div>
               
                <div className="space-y-2">
@@ -119,14 +119,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
                 </div>
                 <input 
                   type="range" 
-                  min="0.0500" 
+                  min="0.0450" 
                   max="0.0700" 
                   step="0.0001"
                   value={config.kill}
                   onChange={(e) => updateConfig('kill', parseFloat(e.target.value))}
                   className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
                 />
-                <p className="text-[8px] text-white/20 leading-tight">Controls how fast the pattern stabilizes or dies out.</p>
+                <p className="text-[8px] text-white/20 leading-tight">Controls pattern stability. Low = Solids, High = Sparse.</p>
               </div>
             </div>
           </div>
