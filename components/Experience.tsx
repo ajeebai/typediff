@@ -12,6 +12,7 @@ interface ExperienceProps {
 }
 
 const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
+  // Memoize the vector to prevent re-renders
   const aberrationOffset = useMemo(() => new THREE.Vector2(0.004, 0.004), []);
 
   return (
