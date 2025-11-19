@@ -2,6 +2,7 @@ import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import { EffectComposer, DepthOfField, ChromaticAberration, Bloom, Noise } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
+import * as THREE from 'three';
 import { ReactionDiffusion } from './ReactionDiffusion';
 import { AppConfig } from '../types';
 
@@ -25,7 +26,7 @@ const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
         <ReactionDiffusion textInput={textInput} config={config} />
 
         {/* Post Processing Pipeline */}
-        <EffectComposer disableNormalPass multisampling={0}>
+        <EffectComposer multisampling={0}>
           <Bloom 
             luminanceThreshold={0.2} 
             mipmapBlur 
@@ -35,7 +36,7 @@ const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
           
           <ChromaticAberration
             blendFunction={BlendFunction.NORMAL}
-            offset={[0.004, 0.004]} 
+            offset={new THREE.Vector2(0.004, 0.004)} 
           />
 
           <DepthOfField
