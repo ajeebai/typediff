@@ -291,18 +291,18 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
 
       {/* Center Start Button */}
       {!started && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 backdrop-blur-sm transition-opacity duration-500 z-20">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90 transition-opacity duration-700 z-50">
           <button 
             onClick={(e) => {
                 e.stopPropagation();
                 handleStart();
             }}
-            className="group relative px-12 py-6 bg-transparent border border-white/20 hover:border-pink-500 transition-colors duration-300"
+            className="group relative p-12 focus:outline-none transition-all duration-700"
           >
-             <span className="text-white font-mono text-lg tracking-[0.2em] group-hover:text-pink-400 transition-colors">
-               BEGIN
+             <span className="font-['Inter'] font-thin text-5xl md:text-6xl text-white/80 tracking-[0.1em] lowercase italic group-hover:text-white group-hover:tracking-[0.2em] group-hover:blur-[1px] transition-all duration-1000 ease-out block">
+               begin
              </span>
-             <div className="absolute inset-0 bg-pink-500/10 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
+             <span className="absolute bottom-10 left-1/2 -translate-x-1/2 h-[1px] bg-white/30 w-0 group-hover:w-16 transition-all duration-700 ease-out"></span>
           </button>
         </div>
       )}
