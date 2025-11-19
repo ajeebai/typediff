@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { EffectComposer, DepthOfField, ChromaticAberration, Bloom, Noise } from '@react-three/postprocessing';
@@ -22,7 +23,7 @@ const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
         dpr={[1, 1.5]} 
         gl={{ antialias: false, stencil: false, depth: false, powerPreference: "high-performance" }}
       >
-        <color attach="background" args={['#050505']} />
+        <color attach="background" args={[config.backgroundColor]} />
         
         <ambientLight intensity={0.2} />
         

@@ -1,62 +1,24 @@
+
 import React, { useRef, useState } from 'react';
 import { audioSynth } from '../services/AudioSynth';
 import { AppConfig } from '../types';
 
-interface OverlayProps {
-  text: string;
-  setText: (t: string) => void;
+interface SettingsPanelProps {
   config: AppConfig;
   setConfig: (c: AppConfig) => void;
+  setText: (t: string) => void;
 }
 
-// Pre-defined Reaction Diffusion Regimes
+// Refined Reaction Diffusion Regimes for optimal visuals
 const RD_PRESETS = [
-  { name: 'Cellular', feed: 0.030, kill: 0.062 },
-  { name: 'Coral', feed: 0.0545, kill: 0.062 },
+  { name: 'Coral', feed: 0.0545, kill: 0.0620 },
+  { name: 'Mazes', feed: 0.0290, kill: 0.0570 },
   { name: 'Mitosis', feed: 0.0367, kill: 0.0644 },
-  { name: 'Mazes', feed: 0.029, kill: 0.057 },
-  { name: 'Chaos', feed: 0.025, kill: 0.060 },
+  { name: 'Worms', feed: 0.0580, kill: 0.0650 },
+  { name: 'Holes', feed: 0.0340, kill: 0.0560 },
 ];
 
-export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConfig }) => {
-  const [started, setStarted] = useState(false);
-  const [showControls, setShowControls] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Handle typing
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newVal = e.target.value;
-    if (newVal.length > 60) return; 
-    
-    // Allow newlines, respect user casing
-    setText(newVal);
-    
-    // Trigger audio on valid char entry
-    if (newVal.length > text.length) {
-       const charCode = newVal.charCodeAt(newVal.length - 1);
-       audioSynth.triggerNote(charCode);
-    }
-  };
-
-  // Handle initial start for audio context
-  const handleStart = async () => {
-    await audioSynth.init();
-    setStarted(true);
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  };
-
-  // Keep focus on input unless interacting with controls
-  const handleGlobalClick = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.controls-panel')) return;
-    if ((e.target as HTMLElement).closest('button')) return;
-
-    if (started && inputRef.current) {
-      inputRef.current.focus();
-    }
-  };
-
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, setText }) => {
   const updateConfig = (key: keyof AppConfig, value: any) => {
     setConfig({ ...config, [key]: value });
   };
@@ -70,51 +32,8 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConf
   };
 
   return (
-    <div 
-      className="absolute inset-0 z-10 flex flex-col justify-between p-4 md:p-8"
-      onClick={handleGlobalClick}
-    >
-      {/* Hidden Input */}
-      <textarea
-        ref={inputRef}
-        value={text}
-        onChange={handleChange}
-        className="opacity-0 fixed top-0 left-0 pointer-events-auto w-0 h-0 resize-none overflow-hidden"
-        autoFocus={started}
-      />
-
-      {/* Top Bar (Only Controls Toggle) */}
-      <div className="flex justify-end w-full pointer-events-none">
-        <div className="pointer-events-auto">
-          <button 
-            onClick={() => setShowControls(!showControls)}
-            className="text-xs font-mono text-white/60 hover:text-white border border-white/20 px-3 py-1 rounded hover:bg-white/10 transition-colors"
-          >
-            {showControls ? 'HIDE SETTINGS' : 'SETTINGS'}
-          </button>
-        </div>
-      </div>
-
-      {/* Center Start Button */}
-      {!started && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 backdrop-blur-sm transition-opacity duration-500 z-20">
-          <button 
-            onClick={handleStart}
-            className="group relative px-12 py-6 bg-transparent border border-white/20 hover:border-pink-500 transition-colors duration-300"
-          >
-             <span className="text-white font-mono text-lg tracking-[0.2em] group-hover:text-pink-400 transition-colors">
-               BEGIN
-             </span>
-             <div className="absolute inset-0 bg-pink-500/10 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
-          </button>
-        </div>
-      )}
-
-      {/* Controls Panel */}
-      <div className={`controls-panel absolute top-20 right-4 md:right-8 w-72 bg-black/80 backdrop-blur-xl border border-white/10 p-6 text-white transition-transform duration-300 ease-in-out ${showControls ? 'translate-x-0' : 'translate-x-[150%]'} pointer-events-auto max-h-[80vh] overflow-y-auto rounded-sm shadow-2xl`}>
-        
-        <div className="space-y-8">
-          
+    <div className="w-80 h-full flex flex-col p-6 text-white overflow-y-auto">
+       <div className="space-y-8 flex-1">
           {/* Typography Section */}
           <div className="space-y-3">
             <label className="text-[10px] tracking-widest text-pink-500 font-bold block mb-2 border-b border-white/10 pb-1">TYPEFACE</label>
@@ -165,7 +84,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConf
                   key={preset.name}
                   onClick={() => applyPreset(preset)}
                   className={`text-[10px] font-mono py-2 border transition-all duration-200 
-                    ${Math.abs(config.feed - preset.feed) < 0.001 
+                    ${Math.abs(config.feed - preset.feed) < 0.001 && Math.abs(config.kill - preset.kill) < 0.001
                       ? 'bg-cyan-400/20 border-cyan-400 text-cyan-200' 
                       : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5 hover:text-white'}`}
                 >
@@ -174,31 +93,40 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConf
               ))}
             </div>
 
-            {/* Fine Tuning (Collapsible/Small) */}
-            <div className="pt-2 space-y-2 opacity-60 hover:opacity-100 transition-opacity">
-              <div className="space-y-1">
-                <div className="flex justify-between text-[9px] text-white/30 font-mono">
-                  <span>FEED RATE</span>
-                  <span>{config.feed.toFixed(4)}</span>
+            {/* Fine Tuning - Simplified & Safer Ranges */}
+            <div className="pt-4 space-y-4 border-t border-white/5 mt-4">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[9px] text-cyan-200/70 font-mono">
+                  <span>GROWTH (FEED)</span>
+                  <span className="bg-white/5 px-1.5 py-0.5 rounded">{config.feed.toFixed(4)}</span>
                 </div>
                 <input 
-                  type="range" min="0.01" max="0.1" step="0.0001"
+                  type="range" 
+                  min="0.0180" 
+                  max="0.0620" 
+                  step="0.0001"
                   value={config.feed}
                   onChange={(e) => updateConfig('feed', parseFloat(e.target.value))}
-                  className="w-full accent-cyan-500 h-1 bg-white/10 appearance-none rounded-full"
+                  className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
                 />
+                <p className="text-[8px] text-white/20 leading-tight">Controls how fast the pattern expands into empty space.</p>
               </div>
-               <div className="space-y-1">
-                <div className="flex justify-between text-[9px] text-white/30 font-mono">
-                  <span>KILL RATE</span>
-                  <span>{config.kill.toFixed(4)}</span>
+              
+               <div className="space-y-2">
+                <div className="flex justify-between items-center text-[9px] text-cyan-200/70 font-mono">
+                  <span>DECAY (KILL)</span>
+                  <span className="bg-white/5 px-1.5 py-0.5 rounded">{config.kill.toFixed(4)}</span>
                 </div>
                 <input 
-                  type="range" min="0.01" max="0.1" step="0.0001"
+                  type="range" 
+                  min="0.0500" 
+                  max="0.0700" 
+                  step="0.0001"
                   value={config.kill}
                   onChange={(e) => updateConfig('kill', parseFloat(e.target.value))}
-                  className="w-full accent-cyan-500 h-1 bg-white/10 appearance-none rounded-full"
+                  className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
                 />
+                <p className="text-[8px] text-white/20 leading-tight">Controls how fast the pattern stabilizes or dies out.</p>
               </div>
             </div>
           </div>
@@ -233,14 +161,14 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConf
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-3 gap-2 pt-2">
               <div>
                 <label className="text-[9px] text-white/30 font-mono block mb-1">PRIMARY</label>
                 <input 
                   type="color" 
                   value={config.color1}
                   onChange={(e) => updateConfig('color1', e.target.value)}
-                  className="w-full h-6 bg-transparent border-0 p-0 cursor-pointer rounded"
+                  className="w-full h-6 bg-transparent border-0 p-0 cursor-pointer rounded opacity-80 hover:opacity-100"
                 />
               </div>
               <div>
@@ -249,7 +177,16 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConf
                   type="color" 
                   value={config.color2}
                   onChange={(e) => updateConfig('color2', e.target.value)}
-                  className="w-full h-6 bg-transparent border-0 p-0 cursor-pointer rounded"
+                  className="w-full h-6 bg-transparent border-0 p-0 cursor-pointer rounded opacity-80 hover:opacity-100"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] text-white/30 font-mono block mb-1">BG</label>
+                <input 
+                  type="color" 
+                  value={config.backgroundColor}
+                  onChange={(e) => updateConfig('backgroundColor', e.target.value)}
+                  className="w-full h-6 bg-transparent border-0 p-0 cursor-pointer rounded opacity-80 hover:opacity-100"
                 />
               </div>
             </div>
@@ -264,9 +201,111 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConf
                  CLEAR CANVAS
                </button>
           </div>
-        </div>
+       </div>
 
+       {/* Footer Credit */}
+       <div className="pt-6 pb-2 text-center border-t border-white/5 mt-4">
+          <p className="text-[9px] text-white/30 font-mono">
+            Made by <a href="https://bykins.com" target="_blank" rel="noreferrer" className="text-white/50 hover:text-white underline decoration-white/30 transition-colors">kins</a>
+          </p>
+       </div>
+    </div>
+  );
+};
+
+interface OverlayProps {
+  text: string;
+  setText: (t: string) => void;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: (v: boolean) => void;
+}
+
+export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen }) => {
+  const [started, setStarted] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Handle typing
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newVal = e.target.value;
+    if (newVal.length > 60) return; 
+    
+    // Allow newlines, respect user casing
+    setText(newVal);
+    
+    // Trigger audio on valid char entry
+    if (newVal.length > text.length) {
+       const charCode = newVal.charCodeAt(newVal.length - 1);
+       audioSynth.triggerNote(charCode);
+    }
+  };
+
+  // Handle initial start for audio context
+  const handleStart = async () => {
+    await audioSynth.init();
+    setStarted(true);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  // Keep focus on input unless interacting with controls or buttons
+  const handleGlobalClick = (e: React.MouseEvent) => {
+    // Prevent focus stealing if clicking on interactive elements
+    if ((e.target as HTMLElement).closest('button')) return;
+    if ((e.target as HTMLElement).closest('input')) return;
+    if ((e.target as HTMLElement).closest('select')) return;
+    
+    if (started && inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  return (
+    <div 
+      className="absolute inset-0 z-10 flex flex-col justify-between p-4 md:p-8 cursor-text"
+      onClick={handleGlobalClick}
+    >
+      {/* Hidden Input */}
+      <textarea
+        ref={inputRef}
+        value={text}
+        onChange={handleChange}
+        className="opacity-0 fixed top-0 left-0 pointer-events-none w-0 h-0 resize-none overflow-hidden"
+        autoFocus={started}
+      />
+
+      {/* Top Bar (Only Controls Toggle) */}
+      <div className="flex justify-end w-full pointer-events-none">
+        <div className="pointer-events-auto">
+          <button 
+            onClick={(e) => {
+                e.stopPropagation();
+                setIsSettingsOpen(!isSettingsOpen);
+            }}
+            className="text-xs font-mono text-white/60 hover:text-white border border-white/20 px-3 py-1 rounded hover:bg-white/10 transition-colors uppercase"
+          >
+            {isSettingsOpen ? 'HIDE SETTINGS' : 'SETTINGS'}
+          </button>
+        </div>
       </div>
+
+      {/* Center Start Button */}
+      {!started && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 backdrop-blur-sm transition-opacity duration-500 z-20">
+          <button 
+            onClick={(e) => {
+                e.stopPropagation();
+                handleStart();
+            }}
+            className="group relative px-12 py-6 bg-transparent border border-white/20 hover:border-pink-500 transition-colors duration-300"
+          >
+             <span className="text-white font-mono text-lg tracking-[0.2em] group-hover:text-pink-400 transition-colors">
+               BEGIN
+             </span>
+             <div className="absolute inset-0 bg-pink-500/10 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
+          </button>
+        </div>
+      )}
 
       {/* Minimal Footer */}
       <div className="w-full flex justify-center pointer-events-none pb-8">

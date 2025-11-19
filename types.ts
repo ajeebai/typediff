@@ -1,3 +1,4 @@
+
 export interface SynthConfig {
   volume: number;
   detune: number;
@@ -18,6 +19,7 @@ export interface AppConfig {
   displacementScale: number;
   color1: string;
   color2: string;
+  backgroundColor: string;
   fontFamily: string;
   fontSize: number;
   bloomIntensity: number;
