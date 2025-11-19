@@ -28,8 +28,8 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConf
     const newVal = e.target.value;
     if (newVal.length > 60) return; 
     
-    // Allow newlines, force uppercase
-    setText(newVal.toUpperCase());
+    // Allow newlines, respect user casing
+    setText(newVal);
     
     // Trigger audio on valid char entry
     if (newVal.length > text.length) {
@@ -100,10 +100,10 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConf
         <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 backdrop-blur-sm transition-opacity duration-500 z-20">
           <button 
             onClick={handleStart}
-            className="group relative px-8 py-4 bg-transparent border border-white/20 hover:border-pink-500 transition-colors duration-300"
+            className="group relative px-12 py-6 bg-transparent border border-white/20 hover:border-pink-500 transition-colors duration-300"
           >
-             <span className="text-white font-mono text-sm tracking-widest group-hover:text-pink-400 transition-colors">
-               INITIALIZE SYSTEM
+             <span className="text-white font-mono text-lg tracking-[0.2em] group-hover:text-pink-400 transition-colors">
+               BEGIN
              </span>
              <div className="absolute inset-0 bg-pink-500/10 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
           </button>
@@ -121,15 +121,28 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, config, setConf
             <select 
               value={config.fontFamily} 
               onChange={(e) => updateConfig('fontFamily', e.target.value)}
-              className="w-full bg-white/5 border border-white/20 text-xs p-2 outline-none focus:border-pink-500 text-white/90 font-mono"
+              className="w-full bg-white/5 border border-white/20 text-xs p-2 outline-none focus:border-pink-500 text-white/90 font-mono mb-2"
             >
-              <option value="Inter">Inter (Clean)</option>
+              <option value="Inter">Inter (Light)</option>
               <option value="Orbitron">Orbitron (Sci-Fi)</option>
-              <option value="Press Start 2P">8-Bit (Retro)</option>
-              <option value="Abril Fatface">Abril (Bold Serif)</option>
-              <option value="Playfair Display">Playfair (Elegant)</option>
-              <option value="Cinzel">Cinzel (Classic)</option>
+              <option value="Monoton">Monoton (Retro)</option>
+              <option value="Rubik Glitch">Rubik (Glitch)</option>
+              <option value="UnifrakturMaguntia">Unifraktur (Gothic)</option>
+              <option value="Permanent Marker">Marker (Graffiti)</option>
             </select>
+
+            <div className="flex items-center justify-between py-2 border-t border-white/5">
+              <span className="text-[10px] font-mono text-white/40">ALL CAPS</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={config.useCaps} 
+                  onChange={(e) => updateConfig('useCaps', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
+              </label>
+            </div>
 
             <div className="flex items-center justify-between pt-1">
               <span className="text-[10px] font-mono text-white/40">SCALE</span>

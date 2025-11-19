@@ -164,16 +164,25 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
       ctx.fillStyle = 'black';
       ctx.fillRect(0, 0, params.resX, params.resY);
       
-      const fontSize = config.fontSize; 
-      ctx.font = `900 ${fontSize}px "${config.fontFamily}", sans-serif`;
+      const fontSize = config.fontSize;
+      
+      // Select weight based on font family for better aesthetic
+      let fontWeight = '400';
+      if (config.fontFamily === 'Inter') fontWeight = '300';
+      if (config.fontFamily === 'Orbitron') fontWeight = '900';
+      
+      ctx.font = `${fontWeight} ${fontSize}px "${config.fontFamily}", sans-serif`;
       ctx.fillStyle = 'white';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
       ctx.save();
 
+      // Handle Case Sensitivity
+      const textToRender = config.useCaps ? textInput.toUpperCase() : textInput;
+
       // Multiline Processing
-      const lines = textInput.split('\n');
+      const lines = textToRender.split('\n');
       // Use a slightly reduced line height for tighter packing in the diffusion map
       const lineHeight = fontSize * 0.85; 
       const totalBlockHeight = lines.length * lineHeight;
@@ -213,7 +222,7 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
       
       textTexture.needsUpdate = true;
     }
-  }, [textInput, textCanvas, textTexture, params.resX, params.resY, config.fontFamily, config.fontSize]);
+  }, [textInput, textCanvas, textTexture, params.resX, params.resY, config.fontFamily, config.fontSize, config.useCaps]);
 
   // Shader Materials
   const simMaterial = useMemo(() => {

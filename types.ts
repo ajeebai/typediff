@@ -21,4 +21,5 @@ export interface AppConfig {
   fontFamily: string;
   fontSize: number;
   bloomIntensity: number;
+  useCaps: boolean;
 }

@@ -14,8 +14,9 @@ const App: React.FC = () => {
     color1: '#00c3ff',
     color2: '#ff0055',
     fontFamily: 'Inter',
-    fontSize: 120,
-    bloomIntensity: 1.2
+    fontSize: 80, // Smaller starting scale
+    bloomIntensity: 1.2,
+    useCaps: true // Start with All Caps
   });
 
   return (
