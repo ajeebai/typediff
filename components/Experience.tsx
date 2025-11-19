@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { EffectComposer, DepthOfField, ChromaticAberration, Bloom, Noise } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
@@ -12,6 +12,8 @@ interface ExperienceProps {
 }
 
 const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
+  const aberrationOffset = useMemo(() => new THREE.Vector2(0.004, 0.004), []);
+
   return (
     <div className="w-full h-full relative bg-black">
       <Canvas
@@ -36,7 +38,7 @@ const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
           
           <ChromaticAberration
             blendFunction={BlendFunction.NORMAL}
-            offset={new THREE.Vector2(0.004, 0.004)} 
+            offset={aberrationOffset}
             radialModulation={false}
             modulationOffset={0}
           />
