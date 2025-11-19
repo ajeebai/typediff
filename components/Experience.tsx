@@ -37,6 +37,8 @@ const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
           <ChromaticAberration
             blendFunction={BlendFunction.NORMAL}
             offset={new THREE.Vector2(0.004, 0.004)} 
+            radialModulation={false}
+            modulationOffset={0}
           />
 
           <DepthOfField
