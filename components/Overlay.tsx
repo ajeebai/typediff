@@ -6,7 +6,7 @@ import { AppConfig } from '../types';
 interface SettingsPanelProps {
   config: AppConfig;
   setConfig: (c: AppConfig) => void;
-  setText: (t: string) => void;
+  onReset: () => void;
   setIsOpen: (v: boolean) => void;
 }
 
@@ -348,7 +348,7 @@ const FONT_OPTIONS = [
     { label: 'Silkscreen', value: 'Silkscreen', fontFamily: 'Silkscreen, cursive' },
 ];
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, setText, setIsOpen }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, onReset, setIsOpen }) => {
   const [activePicker, setActivePicker] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -630,7 +630,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
           </div>
 
           <button 
-            onClick={() => setText("")}
+            onClick={onReset}
             className="w-full mt-1 text-[9px] font-bold tracking-widest uppercase bg-red-500/5 border border-red-500/20 rounded-lg py-3 hover:bg-red-500/20 text-red-400/80 transition-colors"
            >
              Reset Canvas
@@ -652,10 +652,11 @@ interface OverlayProps {
   setText: (t: string | ((prev: string) => string)) => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (v: boolean) => void;
+  hasStarted: boolean;
+  onStart: () => void;
 }
 
-export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen }) => {
-  const [started, setStarted] = useState(false);
+export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen, hasStarted, onStart }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle typing
@@ -678,9 +679,9 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
 
   // Handle initial start for audio context
   const handleStart = async () => {
-    if (!started) {
+    if (!hasStarted) {
         await audioSynth.init();
-        setStarted(true);
+        onStart();
         if (inputRef.current) {
             inputRef.current.focus();
         }
@@ -689,7 +690,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (started) {
+      if (hasStarted) {
         if (document.activeElement !== inputRef.current && inputRef.current) {
            inputRef.current.focus();
         }
@@ -708,7 +709,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [started, setText]);
+  }, [hasStarted, setText]);
 
   const handleGlobalClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
@@ -717,7 +718,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
     if ((e.target as HTMLElement).closest('aside')) return;
     if ((e.target as HTMLElement).closest('.prevent-click')) return;
     
-    if (!started) {
+    if (!hasStarted) {
       handleStart();
     } else if (inputRef.current) {
       inputRef.current.focus();
@@ -734,7 +735,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
         value={text}
         onChange={handleChange}
         className="opacity-0 fixed top-0 left-0 pointer-events-none w-0 h-0 resize-none overflow-hidden"
-        autoFocus={started}
+        autoFocus={hasStarted}
       />
 
       {/* UI Controls Container - Pointer events only for buttons */}
@@ -743,7 +744,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
           {/* Top Left: Desktop Config Trigger */}
           <div className="flex justify-start">
              <div className="pointer-events-auto hidden md:block">
-                {!isSettingsOpen && (
+                {!isSettingsOpen && hasStarted && (
                     <button 
                         onClick={(e) => {
                             e.stopPropagation();
@@ -760,7 +761,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
           {/* Bottom Center: Mobile Hamburger Trigger */}
           <div className="flex justify-center">
              <div className="pointer-events-auto md:hidden pb-4">
-                {!isSettingsOpen && (
+                {!isSettingsOpen && hasStarted && (
                     <button 
                         onClick={(e) => {
                             e.stopPropagation();
@@ -780,7 +781,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
       </div>
 
       {/* Center Start Button (Overlay) */}
-      {!started && (
+      {!hasStarted && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/60 backdrop-blur-sm transition-opacity duration-700 z-50">
           <button 
             className="prevent-click group pointer-events-auto px-6 py-3 rounded-lg border border-white/20 bg-black/50 hover:bg-white/10 backdrop-blur-md transition-all duration-300 ease-out hover:scale-105 hover:border-white/40"

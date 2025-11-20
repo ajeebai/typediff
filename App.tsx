@@ -5,8 +5,10 @@ import { Overlay, SettingsPanel } from './components/Overlay';
 import { AppConfig } from './types';
 
 const App: React.FC = () => {
-  const [text, setText] = useState<string>(""); // Start blank
-  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [text, setText] = useState<string>(""); 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // Start closed
+  const [hasStarted, setHasStarted] = useState(false);
+  const [resetKey, setResetKey] = useState(0); // For forcing canvas reset
   
   // Default stable configuration
   const [config, setConfig] = useState<AppConfig>({
@@ -15,14 +17,24 @@ const App: React.FC = () => {
     displacementScale: 0.6,
     speed: 1.0,
     aberration: 0.004,
-    noise: 0.04, // Reduced noise for smoother look
+    noise: 0.04,
     color1: '#00c3ff',
     color2: '#ff0055',
     backgroundColor: '#050505',
     fontFamily: 'Geist',
-    fontSize: 180, // Considerably larger for "bigger" impact
+    fontSize: 40, // Updated default font size
     bloomIntensity: 1.2,
   });
+
+  const handleStart = () => {
+    setHasStarted(true);
+    setIsSettingsOpen(true);
+  };
+
+  const handleReset = () => {
+    setText("");
+    setResetKey(prev => prev + 1);
+  };
 
   return (
     <main className="flex w-full h-full bg-black overflow-hidden flex-col md:flex-row relative">
@@ -46,7 +58,7 @@ const App: React.FC = () => {
         <SettingsPanel 
           config={config} 
           setConfig={setConfig} 
-          setText={setText} 
+          onReset={handleReset}
           setIsOpen={setIsSettingsOpen}
         />
       </aside>
@@ -56,7 +68,7 @@ const App: React.FC = () => {
         {/* 3D Layer */}
         <div className="absolute inset-0 z-0">
           <Suspense fallback={<div className="w-full h-full bg-black flex items-center justify-center text-white font-mono text-xs">LOADING SHADERS...</div>}>
-            <Experience textInput={text} config={config} />
+            <Experience textInput={text} config={config} resetKey={resetKey} />
           </Suspense>
         </div>
 
@@ -65,7 +77,9 @@ const App: React.FC = () => {
             text={text} 
             setText={setText} 
             isSettingsOpen={isSettingsOpen} 
-            setIsSettingsOpen={setIsSettingsOpen} 
+            setIsSettingsOpen={setIsSettingsOpen}
+            hasStarted={hasStarted}
+            onStart={handleStart}
         />
       </div>
       

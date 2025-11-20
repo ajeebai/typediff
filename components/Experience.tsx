@@ -10,9 +10,10 @@ import { AppConfig } from '../types';
 interface ExperienceProps {
   textInput: string;
   config: AppConfig;
+  resetKey?: number;
 }
 
-const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
+const Experience: React.FC<ExperienceProps> = ({ textInput, config, resetKey = 0 }) => {
   // Use config.aberration to determine offset vector
   const aberrationOffset = useMemo(() => {
     return new THREE.Vector2(config.aberration, config.aberration);
@@ -36,7 +37,7 @@ const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
         
         <ambientLight intensity={0.2} />
         
-        <ReactionDiffusion textInput={textInput} config={config} />
+        <ReactionDiffusion key={resetKey} textInput={textInput} config={config} />
 
         {/* Post Processing Pipeline */}
         <EffectComposer multisampling={0}>
