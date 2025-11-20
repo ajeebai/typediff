@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { audioSynth } from '../services/AudioSynth';
 import { AppConfig } from '../types';
@@ -7,6 +8,161 @@ interface SettingsPanelProps {
   setConfig: (c: AppConfig) => void;
   setText: (t: string) => void;
 }
+
+// -- Color Utility Functions --
+
+const hexToHsl = (hex: string) => {
+  let r = 0, g = 0, b = 0;
+  if (hex.length === 4) {
+    r = parseInt("0x" + hex[1] + hex[1]);
+    g = parseInt("0x" + hex[2] + hex[2]);
+    b = parseInt("0x" + hex[3] + hex[3]);
+  } else if (hex.length === 7) {
+    r = parseInt("0x" + hex[1] + hex[2]);
+    g = parseInt("0x" + hex[3] + hex[4]);
+    b = parseInt("0x" + hex[5] + hex[6]);
+  }
+  r /= 255; g /= 255; b /= 255;
+  let cmin = Math.min(r,g,b), cmax = Math.max(r,g,b), delta = cmax - cmin;
+  let h = 0, s = 0, l = 0;
+
+  if (delta === 0) h = 0;
+  else if (cmax === r) h = ((g - b) / delta) % 6;
+  else if (cmax === g) h = (b - r) / delta + 2;
+  else h = (r - g) / delta + 4;
+
+  h = Math.round(h * 60);
+  if (h < 0) h += 360;
+
+  l = (cmax + cmin) / 2;
+  s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+  
+  return { h, s: Math.round(s * 100), l: Math.round(l * 100) };
+};
+
+const hslToHex = (h: number, s: number, l: number) => {
+  s /= 100; l /= 100;
+  let c = (1 - Math.abs(2 * l - 1)) * s;
+  let x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  let m = l - c/2;
+  let r = 0, g = 0, b = 0;
+
+  if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+  else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+  else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+  else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+  else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+  else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+
+  r = Math.round((r + m) * 255);
+  g = Math.round((g + m) * 255);
+  b = Math.round((b + m) * 255);
+
+  const toHex = (n: number) => {
+    const hex = n.toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  };
+  return "#" + toHex(r) + toHex(g) + toHex(b);
+};
+
+// -- Custom Color Picker Component --
+
+interface ColorPickerProps {
+  label: string;
+  color: string;
+  onChange: (c: string) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+}
+
+const ColorPicker: React.FC<ColorPickerProps> = ({ label, color, onChange, isOpen, onToggle }) => {
+  const [hsl, setHsl] = useState(hexToHsl(color));
+  const [localHex, setLocalHex] = useState(color);
+
+  useEffect(() => {
+    setHsl(hexToHsl(color));
+    setLocalHex(color);
+  }, [color]);
+
+  const updateHSL = (key: 'h' | 's' | 'l', val: number) => {
+    const newHsl = { ...hsl, [key]: val };
+    setHsl(newHsl);
+    const newHex = hslToHex(newHsl.h, newHsl.s, newHsl.l);
+    setLocalHex(newHex);
+    onChange(newHex);
+  };
+
+  const handleHexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalHex(e.target.value);
+    if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+      onChange(e.target.value);
+    }
+  };
+
+  return (
+    <div className="relative mb-2 pointer-events-auto">
+      <div className="flex justify-between items-center mb-1">
+        <label className="text-[9px] text-white/30 font-mono">{label}</label>
+        <div className="flex items-center gap-2">
+            <div className="text-[9px] font-mono text-white/50">{color.toUpperCase()}</div>
+            <button 
+            onClick={onToggle}
+            className="w-6 h-4 rounded border border-white/10 hover:scale-110 transition-transform shadow-sm"
+            style={{ backgroundColor: color }}
+            />
+        </div>
+      </div>
+      
+      {isOpen && (
+        <div className="p-3 bg-zinc-900 rounded border border-white/10 mt-1 space-y-3 animate-in fade-in slide-in-from-top-1 shadow-xl z-20 relative">
+           {/* Standard Hex Input */}
+           <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+             <span className="text-[9px] font-mono text-white/40">#</span>
+             <input 
+                type="text" 
+                value={localHex.replace('#', '')} 
+                onChange={(e) => handleHexChange({ ...e, target: { ...e.target, value: '#' + e.target.value }})}
+                className="bg-transparent text-[10px] font-mono text-white/80 outline-none w-full uppercase"
+                maxLength={6}
+             />
+           </div>
+
+           {/* HSL Sliders */}
+           <div className="space-y-2">
+               <div className="flex items-center gap-2">
+                <span className="text-[8px] font-mono w-3 text-white/40">H</span>
+                <input 
+                type="range" min="0" max="360" 
+                value={hsl.h} 
+                onChange={(e) => updateHSL('h', parseInt(e.target.value))}
+                className="flex-1 h-1.5 bg-gradient-to-r from-red-500 via-green-500 to-blue-500 rounded-full appearance-none cursor-pointer" 
+                />
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="text-[8px] font-mono w-3 text-white/40">S</span>
+                <input 
+                type="range" min="0" max="100" 
+                value={hsl.s} 
+                onChange={(e) => updateHSL('s', parseInt(e.target.value))}
+                className="flex-1 h-1.5 bg-zinc-700 rounded-full appearance-none accent-white cursor-pointer" 
+                />
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="text-[8px] font-mono w-3 text-white/40">L</span>
+                <input 
+                type="range" min="0" max="100" 
+                value={hsl.l} 
+                onChange={(e) => updateHSL('l', parseInt(e.target.value))}
+                className="flex-1 h-1.5 bg-zinc-700 rounded-full appearance-none accent-white cursor-pointer" 
+                />
+            </div>
+           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 // Refined Reaction Diffusion Regimes for distinct, alive visuals
 const RD_PRESETS = [
@@ -19,6 +175,11 @@ const RD_PRESETS = [
 ];
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, setText }) => {
+  const [activePicker, setActivePicker] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
   const updateConfig = (key: keyof AppConfig, value: any) => {
     setConfig({ ...config, [key]: value });
   };
@@ -27,13 +188,108 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
     setConfig({
       ...config,
       feed: preset.feed,
-      kill: preset.kill
+      kill: preset.kill,
+      presetName: preset.name
     });
+    // Update audio profile immediately
+    audioSynth.setProfile(preset.name);
+  };
+
+  const togglePicker = (id: string) => {
+    setActivePicker(activePicker === id ? null : id);
+  };
+
+  // Export Functions
+  const handleSnapshot = () => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
+    
+    // Create a temporary link
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    link.download = `typediff-art-${timestamp}.png`;
+    link.href = canvas.toDataURL('image/png', 1.0);
+    link.click();
+  };
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+        // Stop Recording
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+        setIsRecording(false);
+    } else {
+        // Start Recording
+        const canvas = document.querySelector('canvas');
+        if (!canvas) return;
+        
+        // Ensure audio is initialized
+        await audioSynth.init();
+
+        // Capture stream at 60fps
+        const canvasStream = canvas.captureStream(60); 
+        
+        // Get Audio Stream from Synth
+        const audioStream = audioSynth.getAudioStream();
+        
+        // Combine Tracks
+        const combinedTracks = [
+            ...canvasStream.getVideoTracks(),
+            ...(audioStream ? audioStream.getAudioTracks() : [])
+        ];
+        
+        const combinedStream = new MediaStream(combinedTracks);
+        
+        const mimeTypes = [
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm',
+          'video/mp4'
+        ];
+        
+        const selectedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
+        
+        // High Bitrate for FullHD Quality (25 Mbps)
+        const options: MediaRecorderOptions = { 
+            mimeType: selectedMimeType,
+            videoBitsPerSecond: 25000000 
+        };
+
+        try {
+          const recorder = new MediaRecorder(combinedStream, selectedMimeType ? options : undefined);
+          
+          chunksRef.current = [];
+          recorder.ondataavailable = (e) => {
+              if (e.data.size > 0) chunksRef.current.push(e.data);
+          };
+          
+          recorder.onstop = () => {
+              const blobType = selectedMimeType || 'video/webm';
+              const blob = new Blob(chunksRef.current, { type: blobType });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+              const ext = blobType.includes('mp4') ? 'mp4' : 'webm';
+              link.download = `typediff-video-${timestamp}.${ext}`;
+              link.href = url;
+              link.click();
+              URL.revokeObjectURL(url);
+          };
+
+          recorder.start();
+          mediaRecorderRef.current = recorder;
+          setIsRecording(true);
+        } catch (error) {
+          console.error("Failed to start recording:", error);
+          setIsRecording(false);
+        }
+    }
   };
 
   return (
-    <div className="w-80 h-full flex flex-col p-6 text-white overflow-y-auto">
-       <div className="space-y-8 flex-1">
+    <div className="w-80 h-full flex flex-col p-6 text-white overflow-y-auto pointer-events-auto">
+       <div className="space-y-8 flex-1 pb-20">
           {/* Typography Section */}
           <div className="space-y-3">
             <label className="text-[10px] tracking-widest text-pink-500 font-bold block mb-2 border-b border-white/10 pb-1">TYPEFACE</label>
@@ -86,7 +342,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
                   key={preset.name}
                   onClick={() => applyPreset(preset)}
                   className={`text-[10px] font-mono py-2 border transition-all duration-200 
-                    ${Math.abs(config.feed - preset.feed) < 0.001 && Math.abs(config.kill - preset.kill) < 0.001
+                    ${config.presetName === preset.name
                       ? 'bg-cyan-400/20 border-cyan-400 text-cyan-200' 
                       : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5 hover:text-white'}`}
                 >
@@ -95,7 +351,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
               ))}
             </div>
 
-            {/* Fine Tuning - Ranges expanded to allow for Chaos and Spots */}
+            {/* Fine Tuning */}
             <div className="pt-4 space-y-4 border-t border-white/5 mt-4">
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-[9px] text-cyan-200/70 font-mono">
@@ -111,7 +367,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
                   onChange={(e) => updateConfig('feed', parseFloat(e.target.value))}
                   className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
                 />
-                <p className="text-[8px] text-white/20 leading-tight">Controls expanding waves. Low = Spots, High = Chaos.</p>
               </div>
               
                <div className="space-y-2">
@@ -128,7 +383,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
                   onChange={(e) => updateConfig('kill', parseFloat(e.target.value))}
                   className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
                 />
-                <p className="text-[8px] text-white/20 leading-tight">Controls pattern stability. Low = Solids, High = Sparse.</p>
+              </div>
+              
+              {/* Sim Speed - Restricted to 1.0 */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[9px] text-cyan-200/70 font-mono">
+                  <span>SIM SPEED</span>
+                  <span className="bg-white/5 px-1.5 py-0.5 rounded">{config.speed.toFixed(1)}</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0.1" 
+                  max="1.0" 
+                  step="0.1"
+                  value={config.speed}
+                  onChange={(e) => updateConfig('speed', parseFloat(e.target.value))}
+                  className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
+                />
               </div>
             </div>
           </div>
@@ -163,35 +434,87 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-2 pt-2">
-              <div>
-                <label className="text-[9px] text-white/30 font-mono block mb-1">PRIMARY</label>
-                <input 
-                  type="color" 
-                  value={config.color1}
-                  onChange={(e) => updateConfig('color1', e.target.value)}
-                  className="w-full h-6 bg-transparent border-0 p-0 cursor-pointer rounded opacity-80 hover:opacity-100"
-                />
+            {/* Creative Options: Aberration & Noise */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                <span>RGB SHIFT</span>
+                <span>{(config.aberration * 100).toFixed(1)}</span>
               </div>
-              <div>
-                <label className="text-[9px] text-white/30 font-mono block mb-1">SECONDARY</label>
-                <input 
-                  type="color" 
-                  value={config.color2}
-                  onChange={(e) => updateConfig('color2', e.target.value)}
-                  className="w-full h-6 bg-transparent border-0 p-0 cursor-pointer rounded opacity-80 hover:opacity-100"
-                />
-              </div>
-              <div>
-                <label className="text-[9px] text-white/30 font-mono block mb-1">BG</label>
-                <input 
-                  type="color" 
-                  value={config.backgroundColor}
-                  onChange={(e) => updateConfig('backgroundColor', e.target.value)}
-                  className="w-full h-6 bg-transparent border-0 p-0 cursor-pointer rounded opacity-80 hover:opacity-100"
-                />
-              </div>
+              <input 
+                type="range" min="0" max="0.02" step="0.0005"
+                value={config.aberration}
+                onChange={(e) => updateConfig('aberration', parseFloat(e.target.value))}
+                className="w-full accent-yellow-400 h-1 bg-white/10 appearance-none rounded-full"
+              />
             </div>
+            
+             <div className="space-y-2">
+              <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                <span>NOISE GRAIN</span>
+                <span>{config.noise.toFixed(2)}</span>
+              </div>
+              <input 
+                type="range" min="0" max="0.3" step="0.01"
+                value={config.noise}
+                onChange={(e) => updateConfig('noise', parseFloat(e.target.value))}
+                className="w-full accent-yellow-400 h-1 bg-white/10 appearance-none rounded-full"
+              />
+            </div>
+
+            {/* Custom Color Pickers */}
+            <div className="grid grid-cols-1 gap-1 pt-2">
+              <ColorPicker 
+                label="PRIMARY" 
+                color={config.color1} 
+                onChange={(c) => updateConfig('color1', c)} 
+                isOpen={activePicker === 'color1'}
+                onToggle={() => togglePicker('color1')}
+              />
+              <ColorPicker 
+                label="SECONDARY" 
+                color={config.color2} 
+                onChange={(c) => updateConfig('color2', c)} 
+                isOpen={activePicker === 'color2'}
+                onToggle={() => togglePicker('color2')}
+              />
+              <ColorPicker 
+                label="BACKGROUND" 
+                color={config.backgroundColor} 
+                onChange={(c) => updateConfig('backgroundColor', c)} 
+                isOpen={activePicker === 'bg'}
+                onToggle={() => togglePicker('bg')}
+              />
+            </div>
+          </div>
+
+          {/* Export Section */}
+          <div className="space-y-3">
+             <label className="text-[10px] tracking-widest text-emerald-400 font-bold block mb-2 border-b border-white/10 pb-1">EXPORT</label>
+             <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={handleSnapshot}
+                  className="text-[10px] font-mono py-3 border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-white transition-colors"
+                >
+                  SAVE IMAGE
+                </button>
+                 <button 
+                  onClick={toggleRecording}
+                  className={`text-[10px] font-mono py-3 border transition-colors flex items-center justify-center gap-2
+                    ${isRecording 
+                        ? 'border-red-500 bg-red-500 text-white animate-pulse' 
+                        : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-white'}`}
+                >
+                  {isRecording ? (
+                      <>
+                      <span className="w-2 h-2 bg-white rounded-full"></span>
+                      STOP VIDEO
+                      </>
+                  ) : 'RECORD VIDEO'}
+                </button>
+             </div>
+             <p className="text-[9px] text-white/30 font-mono leading-tight">
+                Images saved as PNG. Video includes audio (WebM/MP4).
+             </p>
           </div>
 
           {/* Actions */}
@@ -220,9 +543,10 @@ interface OverlayProps {
   setText: (t: string | ((prev: string) => string)) => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (v: boolean) => void;
+  config: AppConfig;
 }
 
-export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen }) => {
+export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen, config }) => {
   const [started, setStarted] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -234,15 +558,12 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
     const isDelete = newVal.length < text.length;
     const isAdd = newVal.length > text.length;
 
-    // Allow newlines, respect user casing
     setText(newVal);
     
-    // Trigger audio based on action
     if (isAdd) {
        const charCode = newVal.charCodeAt(newVal.length - 1);
        audioSynth.triggerNote(charCode);
     } else if (isDelete) {
-       // Backspace sound (passing a constant or specific note index)
        audioSynth.triggerNote(8); 
     }
   };
@@ -251,6 +572,8 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
   const handleStart = async () => {
     if (!started) {
         await audioSynth.init();
+        // Apply current preset sound on start
+        if (config.presetName) audioSynth.setProfile(config.presetName);
         setStarted(true);
         if (inputRef.current) {
             inputRef.current.focus();
@@ -258,56 +581,47 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
     }
   };
 
-  // Global keyboard listener
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // If already started, let the textarea handle input naturally
       if (started) {
-        // Just ensure input is focused if we lost it
         if (document.activeElement !== inputRef.current && inputRef.current) {
            inputRef.current.focus();
         }
         return;
       }
 
-      // Check for modifier keys to avoid triggering on shortcuts
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       
-      // Start the app on first valid keystroke (including backspace if they really want to start that way)
       handleStart();
       
-      // If it's a single printable character, treat it as input
       if (e.key.length === 1) {
           setText((prev) => prev + e.key);
           audioSynth.triggerNote(e.key.charCodeAt(0));
-      } else if (e.key === 'Backspace') {
-          // Allow starting with backspace, though text is likely empty
-          // No-op on text, but triggers start
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [started, setText]);
+  }, [started, setText, config.presetName]);
 
-  // Keep focus on input unless interacting with controls or buttons
   const handleGlobalClick = (e: React.MouseEvent) => {
-    // Prevent focus stealing if clicking on interactive elements
+    // Avoid triggering on UI controls
     if ((e.target as HTMLElement).closest('button')) return;
     if ((e.target as HTMLElement).closest('input')) return;
     if ((e.target as HTMLElement).closest('select')) return;
     
-    if (started && inputRef.current) {
+    if (!started) {
+      handleStart();
+    } else if (inputRef.current) {
       inputRef.current.focus();
     }
   };
 
   return (
     <div 
-      className="absolute inset-0 z-10 flex flex-col justify-between p-4 md:p-8 cursor-text"
+      className="absolute inset-0 z-10 flex flex-col justify-between p-4 md:p-8 transition-colors cursor-text pointer-events-auto"
       onClick={handleGlobalClick}
     >
-      {/* Hidden Input */}
       <textarea
         ref={inputRef}
         value={text}
@@ -316,7 +630,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
         autoFocus={started}
       />
 
-      {/* Top Bar (Only Controls Toggle) */}
+      {/* Top Bar */}
       <div className="flex justify-end w-full pointer-events-none">
         <div className="pointer-events-auto">
           <button 
@@ -331,25 +645,18 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
         </div>
       </div>
 
-      {/* Center Start Button (Text-based trigger for Mobile/Click preference) */}
+      {/* Center Start Button (Visual Only) */}
       {!started && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90 transition-opacity duration-700 z-50">
-          <button 
-            onClick={(e) => {
-                e.stopPropagation();
-                handleStart();
-            }}
-            className="group relative p-12 focus:outline-none cursor-pointer"
-          >
-             <span className="font-['Asul'] text-xl md:text-2xl text-white/80 tracking-widest lowercase group-hover:text-white transition-colors duration-500 ease-out block">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90 transition-opacity duration-700 z-50" onClick={handleGlobalClick}>
+          <div className="group relative p-12 cursor-pointer">
+             <span className="font-mono text-sm md:text-base text-white/70 tracking-widest lowercase group-hover:text-white transition-colors duration-500 ease-out block">
                click to begin
              </span>
-             <span className="absolute bottom-10 left-1/2 -translate-x-1/2 h-[1px] bg-white/40 w-0 group-hover:w-12 transition-all duration-500 ease-out"></span>
-          </button>
+             <span className="absolute bottom-10 left-1/2 -translate-x-1/2 h-[1px] bg-white/40 w-12 transition-all duration-500 ease-out"></span>
+          </div>
         </div>
       )}
 
-      {/* Minimal Footer */}
       <div className="w-full flex justify-center pointer-events-none pb-8">
       </div>
     </div>

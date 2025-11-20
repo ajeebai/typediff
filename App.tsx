@@ -1,3 +1,4 @@
+
 import React, { useState, Suspense } from 'react';
 import Experience from './components/Experience';
 import { Overlay, SettingsPanel } from './components/Overlay';
@@ -12,13 +13,17 @@ const App: React.FC = () => {
     feed: 0.030,
     kill: 0.062,
     displacementScale: 0.6,
+    speed: 1.0,
+    aberration: 0.004,
+    noise: 0.1,
     color1: '#00c3ff',
     color2: '#ff0055',
     backgroundColor: '#050505',
     fontFamily: 'Geist',
     fontSize: 45, // Smaller starting scale
     bloomIntensity: 1.2,
-    useCaps: true // Start with All Caps
+    useCaps: true, // Start with All Caps
+    presetName: 'Default'
   });
 
   return (
@@ -38,7 +43,8 @@ const App: React.FC = () => {
             text={text} 
             setText={setText} 
             isSettingsOpen={isSettingsOpen} 
-            setIsSettingsOpen={setIsSettingsOpen} 
+            setIsSettingsOpen={setIsSettingsOpen}
+            config={config}
         />
       </div>
       

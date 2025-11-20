@@ -13,15 +13,24 @@ interface ExperienceProps {
 }
 
 const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
-  // Memoize the vector to prevent re-renders
-  const aberrationOffset = useMemo(() => new THREE.Vector2(0.004, 0.004), []);
+  // Use config.aberration to determine offset vector
+  const aberrationOffset = useMemo(() => {
+    return new THREE.Vector2(config.aberration, config.aberration);
+  }, [config.aberration]);
 
   return (
     <div className="w-full h-full relative bg-black">
       <Canvas
         camera={{ position: [0, 5, 8], fov: 45 }}
         dpr={[1, 1.5]} 
-        gl={{ antialias: false, stencil: false, depth: false, powerPreference: "high-performance" }}
+        // preserveDrawingBuffer is required for canvas.toDataURL() to work (Export Image)
+        gl={{ 
+          antialias: false, 
+          stencil: false, 
+          depth: false, 
+          powerPreference: "high-performance",
+          preserveDrawingBuffer: true 
+        }}
       >
         <color attach="background" args={[config.backgroundColor]} />
         
@@ -52,7 +61,7 @@ const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
             height={480}
           />
           
-          <Noise opacity={0.1} />
+          <Noise opacity={config.noise} />
         </EffectComposer>
       </Canvas>
     </div>

@@ -17,6 +17,9 @@ export interface AppConfig {
   feed: number;
   kill: number;
   displacementScale: number;
+  speed: number;
+  aberration: number;
+  noise: number;
   color1: string;
   color2: string;
   backgroundColor: string;
@@ -24,4 +27,5 @@ export interface AppConfig {
   fontSize: number;
   bloomIntensity: number;
   useCaps: boolean;
+  presetName: string;
 }

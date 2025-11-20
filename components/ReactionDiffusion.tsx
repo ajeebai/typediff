@@ -1,3 +1,4 @@
+
 import React, { useMemo, useRef, useEffect } from 'react';
 import { useFrame, useThree, createPortal } from '@react-three/fiber';
 import { useFBO } from '@react-three/drei';
@@ -131,7 +132,6 @@ interface ReactionDiffusionProps {
 export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput, config }) => {
   
   const params = useMemo(() => ({
-    dt: 1.0,
     resX: 512, // Increased resolution for larger plane
     resY: 512
   }), []);
@@ -242,7 +242,7 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
         uResolution: { value: new THREE.Vector2(params.resX, params.resY) },
         uFeed: { value: config.feed },
         uKill: { value: config.kill },
-        uDt: { value: params.dt }
+        uDt: { value: config.speed } 
       },
       vertexShader: simulationVertexShader,
       fragmentShader: simulationFragmentShader
@@ -272,6 +272,7 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
     if (simMaterial) {
         simMaterial.uniforms.uFeed.value = config.feed;
         simMaterial.uniforms.uKill.value = config.kill;
+        simMaterial.uniforms.uDt.value = config.speed;
     }
     if (renderMaterial) {
         renderMaterial.uniforms.uDisplacementScale.value = config.displacementScale;
