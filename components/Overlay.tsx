@@ -658,6 +658,13 @@ interface OverlayProps {
 
 export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen, hasStarted, onStart }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [hasTyped, setHasTyped] = useState(false);
+
+  useEffect(() => {
+    if (text.length > 0 && !hasTyped) {
+      setHasTyped(true);
+    }
+  }, [text, hasTyped]);
 
   // Handle typing
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -781,17 +788,26 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
           )}
       </div>
 
+      {/* Typing Hint */}
+      {hasStarted && text.length === 0 && !hasTyped && (
+         <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-1000">
+            <span className="text-white/30 font-sans text-xs tracking-[0.3em] uppercase animate-pulse">
+                Start Typing
+            </span>
+         </div>
+      )}
+
       {/* Center Start Button (Overlay) */}
       {!hasStarted && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/80 backdrop-blur-md transition-opacity duration-700 z-50">
           <button 
-            className="prevent-click group pointer-events-auto relative px-12 py-5 rounded-full bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.25),0_8px_32px_rgba(0,0,0,0.5)] hover:bg-white/10 transition-all duration-500 ease-out hover:scale-105 hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.4),0_12px_40px_rgba(0,0,0,0.6)]"
+            className="prevent-click group pointer-events-auto relative px-8 py-3 rounded-full bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.25),0_8px_32px_rgba(0,0,0,0.5)] hover:bg-white/10 transition-all duration-500 ease-out hover:scale-105 hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.4),0_12px_40px_rgba(0,0,0,0.6)]"
             onClick={(e) => {
               e.stopPropagation();
               handleStart();
             }}
           >
-             <span className="font-sans text-xl font-medium text-white/90 tracking-wide group-hover:text-white transition-colors drop-shadow-md">
+             <span className="font-sans text-sm font-medium text-white/90 tracking-widest group-hover:text-white transition-colors drop-shadow-md uppercase">
                Click to Begin
              </span>
           </button>

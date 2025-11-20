@@ -12,17 +12,17 @@ const App: React.FC = () => {
   
   // Default stable configuration
   const [config, setConfig] = useState<AppConfig>({
-    feed: 0.030,
-    kill: 0.062,
+    feed: 0.0545, // Coral default
+    kill: 0.0620, // Coral default
     displacementScale: 0.6,
-    speed: 1.0,
+    speed: 0.8,
     aberration: 0.004,
     noise: 0.04,
     color1: '#00c3ff',
     color2: '#ff0055',
     backgroundColor: '#050505',
-    fontFamily: 'Geist',
-    fontSize: 40, // Updated default font size
+    fontFamily: 'MuseoModerno',
+    fontSize: 40, 
     bloomIntensity: 1.2,
   });
 
