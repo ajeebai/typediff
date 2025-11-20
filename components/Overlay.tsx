@@ -42,12 +42,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
               onChange={(e) => updateConfig('fontFamily', e.target.value)}
               className="w-full bg-white/5 border border-white/20 text-xs p-2 outline-none focus:border-pink-500 text-white/90 font-mono mb-2"
             >
-              <option value="Inter">Inter (Light)</option>
-              <option value="Orbitron">Orbitron (Sci-Fi)</option>
-              <option value="Monoton">Monoton (Retro)</option>
-              <option value="Rubik Glitch">Rubik (Glitch)</option>
+              <option value="Geist">Geist (Modern)</option>
+              <option value="Asul">Asul (Baroque)</option>
+              <option value="MuseoModerno">MuseoModerno (Geo)</option>
               <option value="UnifrakturMaguntia">Unifraktur (Gothic)</option>
-              <option value="Permanent Marker">Marker (Graffiti)</option>
+              <option value="Voltaire">Voltaire (Art Deco)</option>
+              <option value="Parisienne">Parisienne (Script)</option>
+              <option value="Gaegu">Gaegu (Handwritten)</option>
+              <option value="Silkscreen">Silkscreen (Pixel)</option>
             </select>
 
             <div className="flex items-center justify-between py-2 border-t border-white/5">
@@ -299,10 +301,12 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
             }}
             className="group relative p-12 focus:outline-none transition-all duration-700"
           >
-             <span className="font-['Inter'] font-thin text-5xl md:text-6xl text-white/80 tracking-[0.1em] lowercase italic group-hover:text-white group-hover:tracking-[0.2em] group-hover:blur-[1px] transition-all duration-1000 ease-out block">
+             {/* Updated Button: Elegant, serif, non-italic, small case */}
+             <span className="font-['Asul'] font-normal text-5xl md:text-6xl text-white/90 tracking-wider lowercase group-hover:text-white group-hover:scale-105 transition-all duration-1000 ease-out block">
                begin
              </span>
-             <span className="absolute bottom-10 left-1/2 -translate-x-1/2 h-[1px] bg-white/30 w-0 group-hover:w-16 transition-all duration-700 ease-out"></span>
+             {/* Refined underline effect */}
+             <span className="absolute bottom-10 left-1/2 -translate-x-1/2 h-[1px] bg-white/30 w-0 group-hover:w-12 transition-all duration-700 ease-out"></span>
           </button>
         </div>
       )}

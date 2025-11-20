@@ -175,8 +175,10 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
       
       // Select weight based on font family for better aesthetic
       let fontWeight = '400';
-      if (config.fontFamily === 'Inter') fontWeight = '200'; // ExtraLight
-      if (config.fontFamily === 'Orbitron') fontWeight = '900';
+      if (config.fontFamily === 'Geist') fontWeight = '600';
+      if (config.fontFamily === 'Asul') fontWeight = '700';
+      if (config.fontFamily === 'MuseoModerno') fontWeight = '600';
+      if (config.fontFamily === 'Gaegu') fontWeight = '700';
       
       ctx.font = `${fontWeight} ${fontSize}px "${config.fontFamily}", sans-serif`;
       ctx.fillStyle = 'white';

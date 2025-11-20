@@ -1,4 +1,3 @@
-
 import React, { useState, Suspense } from 'react';
 import Experience from './components/Experience';
 import { Overlay, SettingsPanel } from './components/Overlay';
@@ -16,7 +15,7 @@ const App: React.FC = () => {
     color1: '#00c3ff',
     color2: '#ff0055',
     backgroundColor: '#050505',
-    fontFamily: 'Inter',
+    fontFamily: 'Geist',
     fontSize: 45, // Smaller starting scale
     bloomIntensity: 1.2,
     useCaps: true // Start with All Caps
