@@ -28,7 +28,10 @@ const App: React.FC = () => {
 
   const handleStart = () => {
     setHasStarted(true);
-    setIsSettingsOpen(true);
+    // Only auto-open settings on desktop (width >= 768px)
+    if (window.innerWidth >= 768) {
+      setIsSettingsOpen(true);
+    }
   };
 
   const handleReset = () => {

@@ -464,7 +464,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
          <h2 className="text-[11px] font-bold tracking-widest text-white/70 uppercase">Configuration</h2>
          <button 
            onClick={() => setIsOpen(false)}
-           className="text-[10px] text-white/40 hover:text-white transition-colors px-2 py-1 rounded bg-white/5 hover:bg-white/10"
+           className="text-[10px] text-white/40 hover:text-white transition-colors px-2 py-1 rounded bg-white/5 hover:bg-white/10 md:block hidden"
          >
            Hide
          </button>
@@ -758,39 +758,40 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
              </div>
           </div>
 
-          {/* Bottom Center: Mobile Hamburger Trigger */}
-          <div className="flex justify-center">
-             <div className="pointer-events-auto md:hidden pb-4">
-                {!isSettingsOpen && hasStarted && (
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setIsSettingsOpen(true);
-                        }}
-                        className="p-4 rounded-full bg-zinc-900/50 border border-white/10 backdrop-blur-xl text-white hover:bg-zinc-800 transition-all active:scale-95 shadow-lg"
-                    >
-                         <div className="space-y-1.5">
-                           <div className="w-6 h-0.5 bg-white/80 rounded-full shadow-sm"></div>
-                           <div className="w-6 h-0.5 bg-white/80 rounded-full shadow-sm"></div>
-                           <div className="w-6 h-0.5 bg-white/80 rounded-full shadow-sm"></div>
-                        </div>
-                    </button>
-                )}
-             </div>
-          </div>
+      </div>
+
+      {/* Mobile Floating Toggle Button (Fixed Position to sit on top of Bottom Sheet) */}
+      <div className="pointer-events-auto md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-[60]">
+          {hasStarted && (
+            <button 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSettingsOpen(!isSettingsOpen);
+                }}
+                className="p-3 rounded-full bg-black/50 border border-white/10 backdrop-blur-xl text-white hover:bg-zinc-800 transition-all active:scale-95 shadow-lg"
+                aria-label="Toggle Settings"
+            >
+                  <div className="w-5 h-5 relative flex items-center justify-center">
+                    {/* Hamburger / Cross Transition */}
+                    <span className={`absolute h-0.5 w-5 bg-white/90 rounded-full transition-all duration-300 ease-in-out ${isSettingsOpen ? 'rotate-45 translate-y-0' : '-translate-y-1.5'}`} />
+                    <span className={`absolute h-0.5 w-5 bg-white/90 rounded-full transition-all duration-300 ease-in-out ${isSettingsOpen ? 'opacity-0' : 'opacity-100'}`} />
+                    <span className={`absolute h-0.5 w-5 bg-white/90 rounded-full transition-all duration-300 ease-in-out ${isSettingsOpen ? '-rotate-45 translate-y-0' : 'translate-y-1.5'}`} />
+                  </div>
+            </button>
+          )}
       </div>
 
       {/* Center Start Button (Overlay) */}
       {!hasStarted && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/60 backdrop-blur-sm transition-opacity duration-700 z-50">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/80 backdrop-blur-md transition-opacity duration-700 z-50">
           <button 
-            className="prevent-click group pointer-events-auto px-6 py-3 rounded-lg border border-white/20 bg-black/50 hover:bg-white/10 backdrop-blur-md transition-all duration-300 ease-out hover:scale-105 hover:border-white/40"
+            className="prevent-click group pointer-events-auto relative px-12 py-5 rounded-full bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.25),0_8px_32px_rgba(0,0,0,0.5)] hover:bg-white/10 transition-all duration-500 ease-out hover:scale-105 hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.4),0_12px_40px_rgba(0,0,0,0.6)]"
             onClick={(e) => {
               e.stopPropagation();
               handleStart();
             }}
           >
-             <span className="font-sans text-xs font-bold text-white/90 tracking-[0.2em] uppercase group-hover:text-white transition-colors">
+             <span className="font-sans text-xl font-medium text-white/90 tracking-wide group-hover:text-white transition-colors drop-shadow-md">
                Click to Begin
              </span>
           </button>
