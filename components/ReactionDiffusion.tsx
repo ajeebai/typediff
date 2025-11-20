@@ -132,8 +132,8 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
   
   const params = useMemo(() => ({
     dt: 1.0,
-    resX: 300, // Slight increase for better multiline text resolution
-    resY: 300
+    resX: 512, // Increased resolution for larger plane
+    resY: 512
   }), []);
 
   // Framebuffers
@@ -314,7 +314,7 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
 
       <mesh rotation={[-Math.PI / 3.5, 0, 0]} position={[0, 0, 0]}>
         {/* Optimized geometry for detail vs performance */}
-        <planeGeometry args={[10, 10, 240, 240]} />
+        <planeGeometry args={[18, 18, 300, 300]} />
         <primitive object={renderMaterial} attach="material" />
       </mesh>
     </>

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { audioSynth } from '../services/AudioSynth';
 import { AppConfig } from '../types';
 
@@ -217,7 +217,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
 
 interface OverlayProps {
   text: string;
-  setText: (t: string) => void;
+  setText: (t: string | ((prev: string) => string)) => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (v: boolean) => void;
 }
@@ -231,24 +231,64 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
     const newVal = e.target.value;
     if (newVal.length > 60) return; 
     
+    const isDelete = newVal.length < text.length;
+    const isAdd = newVal.length > text.length;
+
     // Allow newlines, respect user casing
     setText(newVal);
     
-    // Trigger audio on valid char entry
-    if (newVal.length > text.length) {
+    // Trigger audio based on action
+    if (isAdd) {
        const charCode = newVal.charCodeAt(newVal.length - 1);
        audioSynth.triggerNote(charCode);
+    } else if (isDelete) {
+       // Backspace sound (passing a constant or specific note index)
+       audioSynth.triggerNote(8); 
     }
   };
 
   // Handle initial start for audio context
   const handleStart = async () => {
-    await audioSynth.init();
-    setStarted(true);
-    if (inputRef.current) {
-      inputRef.current.focus();
+    if (!started) {
+        await audioSynth.init();
+        setStarted(true);
+        if (inputRef.current) {
+            inputRef.current.focus();
+        }
     }
   };
+
+  // Global keyboard listener
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // If already started, let the textarea handle input naturally
+      if (started) {
+        // Just ensure input is focused if we lost it
+        if (document.activeElement !== inputRef.current && inputRef.current) {
+           inputRef.current.focus();
+        }
+        return;
+      }
+
+      // Check for modifier keys to avoid triggering on shortcuts
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      
+      // Start the app on first valid keystroke (including backspace if they really want to start that way)
+      handleStart();
+      
+      // If it's a single printable character, treat it as input
+      if (e.key.length === 1) {
+          setText((prev) => prev + e.key);
+          audioSynth.triggerNote(e.key.charCodeAt(0));
+      } else if (e.key === 'Backspace') {
+          // Allow starting with backspace, though text is likely empty
+          // No-op on text, but triggers start
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [started, setText]);
 
   // Keep focus on input unless interacting with controls or buttons
   const handleGlobalClick = (e: React.MouseEvent) => {
@@ -291,7 +331,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
         </div>
       </div>
 
-      {/* Center Start Button */}
+      {/* Center Start Button (Text-based trigger for Mobile/Click preference) */}
       {!started && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90 transition-opacity duration-700 z-50">
           <button 
@@ -299,23 +339,18 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
                 e.stopPropagation();
                 handleStart();
             }}
-            className="group relative p-12 focus:outline-none transition-all duration-700"
+            className="group relative p-12 focus:outline-none cursor-pointer"
           >
-             {/* Updated Button: Elegant, serif, non-italic, small case */}
-             <span className="font-['Asul'] font-normal text-5xl md:text-6xl text-white/90 tracking-wider lowercase group-hover:text-white group-hover:scale-105 transition-all duration-1000 ease-out block">
-               begin
+             <span className="font-['Asul'] text-xl md:text-2xl text-white/80 tracking-widest lowercase group-hover:text-white transition-colors duration-500 ease-out block">
+               click to begin
              </span>
-             {/* Refined underline effect */}
-             <span className="absolute bottom-10 left-1/2 -translate-x-1/2 h-[1px] bg-white/30 w-0 group-hover:w-12 transition-all duration-700 ease-out"></span>
+             <span className="absolute bottom-10 left-1/2 -translate-x-1/2 h-[1px] bg-white/40 w-0 group-hover:w-12 transition-all duration-500 ease-out"></span>
           </button>
         </div>
       )}
 
       {/* Minimal Footer */}
       <div className="w-full flex justify-center pointer-events-none pb-8">
-        <p className={`text-white/20 font-mono text-[10px] tracking-[0.2em] transition-opacity duration-500 ${started && text.length === 0 ? 'opacity-100 animate-pulse' : 'opacity-0'}`}>
-          TYPE TO GENERATE
-        </p>
       </div>
     </div>
   );
