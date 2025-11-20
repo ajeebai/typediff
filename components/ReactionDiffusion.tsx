@@ -58,11 +58,10 @@ void main() {
     float nextB = b + (0.5 * lapB + a * b * b - (uKill + uFeed) * b) * uDt;
 
     // Text Input Injection
-    // Reduced mix strength (0.1) allows the RD pattern to take over the shape 
-    // rather than being forced into the exact font shape constantly.
+    // Reduced mix strength (0.02) allows the RD pattern to take over natural distortion
     float seed = texture2D(uInput, vUv).r;
     if(seed > 0.1) {
-        nextB = mix(nextB, 0.9, 0.1); 
+        nextB = mix(nextB, 0.9, 0.02); 
     }
 
     gl_FragColor = vec4(clamp(nextA, 0.0, 1.0), clamp(nextB, 0.0, 1.0), 0.0, 1.0);
@@ -132,8 +131,9 @@ interface ReactionDiffusionProps {
 export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput, config }) => {
   
   const params = useMemo(() => ({
-    resX: 512, // Increased resolution for larger plane
-    resY: 512
+    // Restored to 1024 for high fidelity
+    resX: 1024, 
+    resY: 1024
   }), []);
 
   // Framebuffers
@@ -166,72 +166,85 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
 
   // Update Text Texture with Fonts and Multiline support
   useEffect(() => {
-    const ctx = textCanvas.getContext('2d');
-    if (ctx) {
-      ctx.fillStyle = 'black';
-      ctx.fillRect(0, 0, params.resX, params.resY);
-      
-      const fontSize = config.fontSize;
-      
-      // Select weight based on font family for better aesthetic
-      let fontWeight = '400';
-      if (config.fontFamily === 'Geist') fontWeight = '600';
-      if (config.fontFamily === 'Asul') fontWeight = '700';
-      if (config.fontFamily === 'MuseoModerno') fontWeight = '600';
-      if (config.fontFamily === 'Gaegu') fontWeight = '700';
-      
-      ctx.font = `${fontWeight} ${fontSize}px "${config.fontFamily}", sans-serif`;
-      ctx.fillStyle = 'white';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      ctx.save();
+    const renderText = () => {
+        const ctx = textCanvas.getContext('2d');
+        if (!ctx) return;
 
-      // Handle Case Sensitivity
-      const textToRender = config.useCaps ? textInput.toUpperCase() : textInput;
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, params.resX, params.resY);
+        
+        const fontSize = config.fontSize;
+        
+        // Select weight based on font family for better aesthetic
+        let fontWeight = '400';
+        if (config.fontFamily === 'Geist') fontWeight = '600';
+        if (config.fontFamily === 'Asul') fontWeight = '700';
+        if (config.fontFamily === 'MuseoModerno') fontWeight = '600';
+        if (config.fontFamily === 'Gaegu') fontWeight = '700';
+        
+        const fontStr = `${fontWeight} ${fontSize}px "${config.fontFamily}", sans-serif`;
+        ctx.font = fontStr;
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        ctx.save();
 
-      // Multiline Processing
-      const lines = textToRender.split('\n');
-      // Use a slightly reduced line height for tighter packing in the diffusion map
-      const lineHeight = fontSize * 0.85; 
-      const totalBlockHeight = lines.length * lineHeight;
-      
-      // Calculate widest line for scaling
-      let maxLineWidth = 0;
-      lines.forEach(line => {
-          const metrics = ctx.measureText(line);
-          if (metrics.width > maxLineWidth) maxLineWidth = metrics.width;
-      });
-      
-      const maxW = params.resX * 0.9;
-      const maxH = params.resY * 0.9;
-      
-      let scale = 1;
-      // Constraint by width
-      if (maxLineWidth > maxW) {
-         scale = maxW / maxLineWidth;
-      }
-      // Constraint by height
-      if (totalBlockHeight * scale > maxH) {
-         scale = maxH / totalBlockHeight;
-      }
-      
-      ctx.translate(params.resX / 2, params.resY / 2);
-      ctx.scale(scale, scale);
-      
-      // Draw lines centered
-      // Calculate Y start to center the whole block
-      const startY = -((lines.length - 1) * lineHeight) / 2;
+        // Handle Case Sensitivity - Removed useCaps logic, assumes textInput is correct
+        const textToRender = textInput;
 
-      lines.forEach((line, i) => {
-          ctx.fillText(line, 0, startY + (i * lineHeight));
-      });
-      
-      ctx.restore();
-      
-      textTexture.needsUpdate = true;
-    }
-  }, [textInput, textCanvas, textTexture, params.resX, params.resY, config.fontFamily, config.fontSize, config.useCaps]);
+        // Multiline Processing
+        const lines = textToRender.split('\n');
+        // Use a slightly reduced line height for tighter packing in the diffusion map
+        const lineHeight = fontSize * 0.85; 
+        const totalBlockHeight = lines.length * lineHeight;
+        
+        // Calculate widest line for scaling
+        let maxLineWidth = 0;
+        lines.forEach(line => {
+            const metrics = ctx.measureText(line);
+            if (metrics.width > maxLineWidth) maxLineWidth = metrics.width;
+        });
+        
+        // Safety margin of 85% to ensure nothing touches edges
+        const maxW = params.resX * 0.85;
+        const maxH = params.resY * 0.85;
+        
+        let scale = 1;
+        // Constraint by width
+        if (maxLineWidth > maxW) {
+            scale = maxW / maxLineWidth;
+        }
+        // Constraint by height
+        if (totalBlockHeight * scale > maxH) {
+            scale = maxH / totalBlockHeight;
+        }
+        
+        ctx.translate(params.resX / 2, params.resY / 2);
+        ctx.scale(scale, scale);
+        
+        // Draw lines centered
+        // Calculate Y start to center the whole block
+        const startY = -((lines.length - 1) * lineHeight) / 2;
+
+        lines.forEach((line, i) => {
+            ctx.fillText(line, 0, startY + (i * lineHeight));
+        });
+        
+        ctx.restore();
+        
+        textTexture.needsUpdate = true;
+    };
+
+    // Immediate render
+    renderText();
+
+    // Ensure font is loaded then re-render to avoid FOUT/Fallback
+    document.fonts.load(`600 ${config.fontSize}px "${config.fontFamily}"`).then(() => {
+        renderText();
+    });
+
+  }, [textInput, textCanvas, textTexture, params.resX, params.resY, config.fontFamily, config.fontSize]);
 
   // Shader Materials
   const simMaterial = useMemo(() => {
@@ -313,9 +326,9 @@ export const ReactionDiffusion: React.FC<ReactionDiffusionProps> = ({ textInput,
         scene
       )}
 
-      <mesh rotation={[-Math.PI / 3.5, 0, 0]} position={[0, 0, 0]}>
+      <mesh rotation={[-Math.PI / 4.5, 0, 0]} position={[0, 0, 0]}>
         {/* Optimized geometry for detail vs performance */}
-        <planeGeometry args={[18, 18, 300, 300]} />
+        <planeGeometry args={[18, 18, 512, 512]} />
         <primitive object={renderMaterial} attach="material" />
       </mesh>
     </>

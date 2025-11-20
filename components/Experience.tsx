@@ -21,8 +21,8 @@ const Experience: React.FC<ExperienceProps> = ({ textInput, config }) => {
   return (
     <div className="w-full h-full relative bg-black">
       <Canvas
-        camera={{ position: [0, 5, 8], fov: 45 }}
-        dpr={[1, 1.5]} 
+        camera={{ position: [0, 1, 6], fov: 45 }}
+        dpr={1.5} // Balanced DPR: Crisp enough for retina, but light enough for smooth video encoding
         // preserveDrawingBuffer is required for canvas.toDataURL() to work (Export Image)
         gl={{ 
           antialias: false, 

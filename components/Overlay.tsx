@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { audioSynth } from '../services/AudioSynth';
 import { AppConfig } from '../types';
 
@@ -7,10 +7,10 @@ interface SettingsPanelProps {
   config: AppConfig;
   setConfig: (c: AppConfig) => void;
   setText: (t: string) => void;
+  setIsOpen: (v: boolean) => void;
 }
 
 // -- Color Utility Functions --
-
 const hexToHsl = (hex: string) => {
   let r = 0, g = 0, b = 0;
   if (hex.length === 4) {
@@ -65,7 +65,159 @@ const hslToHex = (h: number, s: number, l: number) => {
   return "#" + toHex(r) + toHex(g) + toHex(b);
 };
 
-// -- Custom Color Picker Component --
+const hsvToHex = (h: number, s: number, v: number) => {
+    s /= 100;
+    v /= 100;
+    let c = v * s;
+    let x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    let m = v - c;
+    let r = 0, g = 0, b = 0;
+
+    if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+    else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+    else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+    else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+    else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+    else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+
+    const toHex = (n: number) => {
+        const hex = Math.round((n + m) * 255).toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+    };
+    return "#" + toHex(r) + toHex(g) + toHex(b);
+};
+
+// Convert Hex to HSV (approximate via HSL)
+const hexToHsv = (hex: string) => {
+    const { h, s, l } = hexToHsl(hex);
+    const s_norm = s / 100;
+    const l_norm = l / 100;
+    
+    const v = l_norm + s_norm * Math.min(l_norm, 1 - l_norm);
+    const s_hsv = v === 0 ? 0 : 2 * (1 - l_norm / v);
+    
+    return { h, s: s_hsv * 100, v: v * 100 };
+};
+
+// -- UI Components --
+
+const GlassSlider: React.FC<{
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  displayValue?: string;
+  withTicks?: boolean;
+  className?: string;
+}> = ({ label, value, min, max, step, onChange, displayValue, withTicks, className }) => {
+  const percent = ((value - min) / (max - min)) * 100;
+  const tickCount = 5;
+  const ticks = Array.from({ length: tickCount }).map((_, i) => i * (100 / (tickCount - 1)));
+
+  return (
+    <div className={`group py-2 px-4 hover:bg-white/5 transition-colors ${className}`}>
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-[9px] font-bold tracking-widest text-white/60 group-hover:text-white/90 transition-colors uppercase">{label}</span>
+        <span className="text-[8px] font-mono text-white/40 bg-black/20 px-1.5 py-0.5 rounded min-w-[30px] text-center">{displayValue || value}</span>
+      </div>
+      <div className="relative h-4 flex items-center w-full">
+         <input 
+            type="range" min={min} max={max} step={step} value={value} onChange={onChange}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+         />
+         
+         {/* Track */}
+         <div className="absolute w-full h-1 bg-white/10 rounded-full overflow-hidden backdrop-blur-sm z-0">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-400/80 to-blue-200 transition-all duration-100 ease-out" 
+              style={{ width: `${percent}%` }}
+            />
+         </div>
+
+         {/* Ticks */}
+         {withTicks && (
+            <div className="absolute inset-0 w-full h-full pointer-events-none flex justify-between items-center px-0.5 z-0 opacity-20">
+                {ticks.map((t, i) => (
+                    <div key={i} className={`w-0.5 h-0.5 rounded-full ${Math.abs(t - percent) < 5 ? 'bg-white' : 'bg-white/50'}`} style={{ left: `${t}%` }}></div>
+                ))}
+            </div>
+         )}
+
+         {/* Thumb */}
+         <div 
+            className="absolute w-3 h-3 bg-white border border-blue-50 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.5)] pointer-events-none transition-all duration-100 ease-out z-10 group-hover:scale-110"
+            style={{ left: `calc(${percent}% - 6px)` }}
+         />
+      </div>
+    </div>
+  );
+};
+
+interface GlassDropdownProps {
+  label: string;
+  value: string;
+  options: { label: string; value: string; fontFamily: string }[];
+  onChange: (val: string) => void;
+}
+
+const GlassDropdown: React.FC<GlassDropdownProps> = ({ label, value, options, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      {/* Trigger */}
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-2 cursor-pointer transition-colors"
+      >
+         <span className="text-[9px] font-bold tracking-widest text-white/60 uppercase">{label}</span>
+         <div className="flex items-center gap-2 min-w-0">
+           <span className="text-[10px] text-white truncate" style={{ fontFamily: selectedOption.fontFamily }}>
+               {selectedOption.label}
+           </span>
+           <svg className={`w-2 h-2 text-white/40 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+           </svg>
+         </div>
+      </div>
+
+      {/* Menu */}
+      {isOpen && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-white/10 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto scrollbar-hide overflow-hidden">
+           {options.map(opt => (
+               <div 
+                   key={opt.value}
+                   onClick={() => {
+                       onChange(opt.value);
+                       setIsOpen(false);
+                   }}
+                   className={`px-3 py-2 text-[11px] text-white cursor-pointer hover:bg-white/10 flex items-center justify-between
+                       ${opt.value === value ? 'bg-white/5' : ''}`}
+               >
+                   <span style={{ fontFamily: opt.fontFamily }}>{opt.label}</span>
+                   {opt.value === value && <div className="w-1.5 h-1.5 rounded-full bg-blue-400"/>}
+               </div>
+           ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface ColorPickerProps {
   label: string;
@@ -76,86 +228,99 @@ interface ColorPickerProps {
 }
 
 const ColorPicker: React.FC<ColorPickerProps> = ({ label, color, onChange, isOpen, onToggle }) => {
-  const [hsl, setHsl] = useState(hexToHsl(color));
-  const [localHex, setLocalHex] = useState(color);
+  const [hsv, setHsv] = useState(hexToHsv(color));
+  const satRef = useRef<HTMLDivElement>(null);
+  const isDraggingSat = useRef(false);
 
   useEffect(() => {
-    setHsl(hexToHsl(color));
-    setLocalHex(color);
+    if (!isDraggingSat.current) {
+        setHsv(hexToHsv(color));
+    }
   }, [color]);
 
-  const updateHSL = (key: 'h' | 's' | 'l', val: number) => {
-    const newHsl = { ...hsl, [key]: val };
-    setHsl(newHsl);
-    const newHex = hslToHex(newHsl.h, newHsl.s, newHsl.l);
-    setLocalHex(newHex);
-    onChange(newHex);
+  const updateColor = (newHsv: { h: number, s: number, v: number }) => {
+    setHsv(newHsv);
+    onChange(hsvToHex(newHsv.h, newHsv.s, newHsv.v));
   };
 
-  const handleHexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocalHex(e.target.value);
-    if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
-      onChange(e.target.value);
-    }
-  };
+  const handleSatInteract = useCallback((e: React.MouseEvent | MouseEvent) => {
+    if (!satRef.current) return;
+    const rect = satRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    
+    // x = Saturation, y = 1 - Value
+    updateColor({ ...hsv, s: x * 100, v: (1 - y) * 100 });
+  }, [hsv, onChange]);
+
+  useEffect(() => {
+    const handleUp = () => isDraggingSat.current = false;
+    const handleMove = (e: MouseEvent) => {
+        if (isDraggingSat.current) {
+            handleSatInteract(e);
+        }
+    };
+    document.addEventListener('mouseup', handleUp);
+    document.addEventListener('mousemove', handleMove);
+    return () => {
+        document.removeEventListener('mouseup', handleUp);
+        document.removeEventListener('mousemove', handleMove);
+    };
+  }, [handleSatInteract]);
 
   return (
-    <div className="relative mb-2 pointer-events-auto">
-      <div className="flex justify-between items-center mb-1">
-        <label className="text-[9px] text-white/30 font-mono">{label}</label>
+    <div className="px-4 py-2 hover:bg-white/5 transition-colors">
+      <div className="flex justify-between items-center cursor-pointer" onClick={onToggle}>
+        <label className="text-[9px] tracking-widest font-bold text-white/60 uppercase">{label}</label>
         <div className="flex items-center gap-2">
-            <div className="text-[9px] font-mono text-white/50">{color.toUpperCase()}</div>
-            <button 
-            onClick={onToggle}
-            className="w-6 h-4 rounded border border-white/10 hover:scale-110 transition-transform shadow-sm"
-            style={{ backgroundColor: color }}
+            <div className="text-[8px] font-mono text-white/40">{color.toUpperCase()}</div>
+            <div 
+              className="w-4 h-3 rounded-sm border border-white/10 shadow-sm ring-1 ring-white/5"
+              style={{ backgroundColor: color }}
             />
         </div>
       </div>
       
       {isOpen && (
-        <div className="p-3 bg-zinc-900 rounded border border-white/10 mt-1 space-y-3 animate-in fade-in slide-in-from-top-1 shadow-xl z-20 relative">
-           {/* Standard Hex Input */}
-           <div className="flex items-center gap-2 border-b border-white/5 pb-2">
-             <span className="text-[9px] font-mono text-white/40">#</span>
-             <input 
-                type="text" 
-                value={localHex.replace('#', '')} 
-                onChange={(e) => handleHexChange({ ...e, target: { ...e.target, value: '#' + e.target.value }})}
-                className="bg-transparent text-[10px] font-mono text-white/80 outline-none w-full uppercase"
-                maxLength={6}
+        <div className="mt-2 space-y-3 pt-2 animate-in fade-in slide-in-from-top-1 pb-2">
+           {/* 2D Color Field: Saturation/Brightness */}
+           <div 
+             ref={satRef}
+             onMouseDown={(e) => { isDraggingSat.current = true; handleSatInteract(e); }}
+             className="w-full h-24 rounded-lg cursor-crosshair relative shadow-inner border border-white/10 overflow-hidden"
+             style={{ 
+                 backgroundColor: `hsl(${hsv.h}, 100%, 50%)`,
+                 backgroundImage: `
+                    linear-gradient(to top, #000, transparent), 
+                    linear-gradient(to right, #fff, transparent)
+                 `
+             }}
+           >
+             <div 
+                className="absolute w-3 h-3 rounded-full border-2 border-white shadow-sm transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ 
+                    left: `${hsv.s}%`, 
+                    top: `${100 - hsv.v}%`,
+                    backgroundColor: color 
+                }}
              />
            </div>
 
-           {/* HSL Sliders */}
-           <div className="space-y-2">
-               <div className="flex items-center gap-2">
-                <span className="text-[8px] font-mono w-3 text-white/40">H</span>
-                <input 
-                type="range" min="0" max="360" 
-                value={hsl.h} 
-                onChange={(e) => updateHSL('h', parseInt(e.target.value))}
-                className="flex-1 h-1.5 bg-gradient-to-r from-red-500 via-green-500 to-blue-500 rounded-full appearance-none cursor-pointer" 
-                />
-            </div>
-            <div className="flex items-center gap-2">
-                <span className="text-[8px] font-mono w-3 text-white/40">S</span>
-                <input 
-                type="range" min="0" max="100" 
-                value={hsl.s} 
-                onChange={(e) => updateHSL('s', parseInt(e.target.value))}
-                className="flex-1 h-1.5 bg-zinc-700 rounded-full appearance-none accent-white cursor-pointer" 
-                />
-            </div>
-            <div className="flex items-center gap-2">
-                <span className="text-[8px] font-mono w-3 text-white/40">L</span>
-                <input 
-                type="range" min="0" max="100" 
-                value={hsl.l} 
-                onChange={(e) => updateHSL('l', parseInt(e.target.value))}
-                className="flex-1 h-1.5 bg-zinc-700 rounded-full appearance-none accent-white cursor-pointer" 
-                />
-            </div>
+           {/* Hue Slider */}
+           <div className="h-3 w-full rounded-full relative overflow-hidden cursor-pointer border border-white/10">
+             <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%)' }} />
+             <input 
+                type="range" 
+                min="0" 
+                max="360" 
+                value={hsv.h} 
+                onChange={(e) => updateColor({ ...hsv, h: parseInt(e.target.value) })}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+             />
+             <div 
+                className="absolute top-0 h-full w-1 bg-white shadow-sm pointer-events-none"
+                style={{ left: `${(hsv.h / 360) * 100}%` }}
+             />
            </div>
         </div>
       )}
@@ -163,8 +328,6 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ label, color, onChange, isOpe
   );
 };
 
-
-// Refined Reaction Diffusion Regimes for distinct, alive visuals
 const RD_PRESETS = [
   { name: 'Coral', feed: 0.0545, kill: 0.0620 },
   { name: 'Mitosis', feed: 0.0367, kill: 0.0644 },
@@ -174,11 +337,23 @@ const RD_PRESETS = [
   { name: 'Spots', feed: 0.0250, kill: 0.0600 },
 ];
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, setText }) => {
+const FONT_OPTIONS = [
+    { label: 'Geist', value: 'Geist', fontFamily: 'Geist, sans-serif' },
+    { label: 'Asul', value: 'Asul', fontFamily: 'Asul, serif' },
+    { label: 'MuseoModerno', value: 'MuseoModerno', fontFamily: 'MuseoModerno, sans-serif' },
+    { label: 'Unifraktur', value: 'UnifrakturMaguntia', fontFamily: 'UnifrakturMaguntia, cursive' },
+    { label: 'Voltaire', value: 'Voltaire', fontFamily: 'Voltaire, sans-serif' },
+    { label: 'Parisienne', value: 'Parisienne', fontFamily: 'Parisienne, cursive' },
+    { label: 'Gaegu', value: 'Gaegu', fontFamily: 'Gaegu, cursive' },
+    { label: 'Silkscreen', value: 'Silkscreen', fontFamily: 'Silkscreen, cursive' },
+];
+
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, setText, setIsOpen }) => {
   const [activePicker, setActivePicker] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const updateConfig = (key: keyof AppConfig, value: any) => {
     setConfig({ ...config, [key]: value });
@@ -188,10 +363,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
     setConfig({
       ...config,
       feed: preset.feed,
-      kill: preset.kill,
-      presetName: preset.name
+      kill: preset.kill
     });
-    // Update audio profile immediately
     audioSynth.setProfile(preset.name);
   };
 
@@ -199,12 +372,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
     setActivePicker(activePicker === id ? null : id);
   };
 
-  // Export Functions
   const handleSnapshot = () => {
     const canvas = document.querySelector('canvas');
     if (!canvas) return;
     
-    // Create a temporary link
     const link = document.createElement('a');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     link.download = `typediff-art-${timestamp}.png`;
@@ -212,52 +383,44 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
     link.click();
   };
 
-  const toggleRecording = async () => {
+  const toggleRecording = () => {
     if (isRecording) {
-        // Stop Recording
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
           mediaRecorderRef.current.stop();
         }
         setIsRecording(false);
     } else {
-        // Start Recording
         const canvas = document.querySelector('canvas');
         if (!canvas) return;
-        
-        // Ensure audio is initialized
-        await audioSynth.init();
 
-        // Capture stream at 60fps
-        const canvasStream = canvas.captureStream(60); 
-        
-        // Get Audio Stream from Synth
+        // Keep 30FPS for performance/compatibility
+        const videoStream = canvas.captureStream(30);
         const audioStream = audioSynth.getAudioStream();
-        
-        // Combine Tracks
-        const combinedTracks = [
-            ...canvasStream.getVideoTracks(),
+
+        // Combine video and audio tracks if available
+        const tracks = [
+            ...videoStream.getVideoTracks(),
             ...(audioStream ? audioStream.getAudioTracks() : [])
         ];
-        
-        const combinedStream = new MediaStream(combinedTracks);
+        const combinedStream = new MediaStream(tracks);
+        streamRef.current = combinedStream;
         
         const mimeTypes = [
-          'video/webm;codecs=vp9,opus',
-          'video/webm;codecs=vp8,opus',
-          'video/webm',
-          'video/mp4'
+          'video/mp4;codecs=avc1.42E01E',
+          'video/mp4',
+          'video/webm;codecs=h264', // Better hardware acceleration support
+          'video/webm;codecs=vp9',
+          'video/webm'
         ];
         
         const selectedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
-        
-        // High Bitrate for FullHD Quality (25 Mbps)
-        const options: MediaRecorderOptions = { 
-            mimeType: selectedMimeType,
-            videoBitsPerSecond: 25000000 
-        };
+        const options = selectedMimeType ? { 
+            mimeType: selectedMimeType, 
+            videoBitsPerSecond: 20000000 // 20 Mbps - Good balance for 1080p/2K without choking browser
+        } : undefined;
 
         try {
-          const recorder = new MediaRecorder(combinedStream, selectedMimeType ? options : undefined);
+          const recorder = new MediaRecorder(combinedStream, options);
           
           chunksRef.current = [];
           recorder.ondataavailable = (e) => {
@@ -275,6 +438,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
               link.href = url;
               link.click();
               URL.revokeObjectURL(url);
+
+              // Stop all tracks
+              if (streamRef.current) {
+                  streamRef.current.getTracks().forEach(track => track.stop());
+                  streamRef.current = null;
+              }
           };
 
           recorder.start();
@@ -288,197 +457,147 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
   };
 
   return (
-    <div className="w-80 h-full flex flex-col p-6 text-white overflow-y-auto pointer-events-auto">
-       <div className="space-y-8 flex-1 pb-20">
+    <div className="w-full md:w-80 h-full flex flex-col p-4 text-white overflow-y-auto scrollbar-hide bg-zinc-950 font-sans">
+       
+       {/* Header with Hide Button */}
+       <div className="flex justify-between items-center mb-4 pb-2 border-b border-white/5">
+         <h2 className="text-[11px] font-bold tracking-widest text-white/70 uppercase">Configuration</h2>
+         <button 
+           onClick={() => setIsOpen(false)}
+           className="text-[10px] text-white/40 hover:text-white transition-colors px-2 py-1 rounded bg-white/5 hover:bg-white/10"
+         >
+           Hide
+         </button>
+       </div>
+
+       <div className="space-y-4 flex-1 pb-20">
+          
           {/* Typography Section */}
-          <div className="space-y-3">
-            <label className="text-[10px] tracking-widest text-pink-500 font-bold block mb-2 border-b border-white/10 pb-1">TYPEFACE</label>
-            <select 
-              value={config.fontFamily} 
-              onChange={(e) => updateConfig('fontFamily', e.target.value)}
-              className="w-full bg-white/5 border border-white/20 text-xs p-2 outline-none focus:border-pink-500 text-white/90 font-mono mb-2"
-            >
-              <option value="Geist">Geist (Modern)</option>
-              <option value="Asul">Asul (Baroque)</option>
-              <option value="MuseoModerno">MuseoModerno (Geo)</option>
-              <option value="UnifrakturMaguntia">Unifraktur (Gothic)</option>
-              <option value="Voltaire">Voltaire (Art Deco)</option>
-              <option value="Parisienne">Parisienne (Script)</option>
-              <option value="Gaegu">Gaegu (Handwritten)</option>
-              <option value="Silkscreen">Silkscreen (Pixel)</option>
-            </select>
+          <div className="space-y-2">
+            <label className="text-[9px] tracking-wider text-white/40 font-bold uppercase block px-1">Typography</label>
+            
+            <div className="bg-white/5 rounded-xl border border-white/10 overflow-visible">
+                <div className="p-1 border-b border-white/5">
+                    <GlassDropdown 
+                        label="Font"
+                        value={config.fontFamily}
+                        options={FONT_OPTIONS}
+                        onChange={(val) => updateConfig('fontFamily', val)}
+                    />
+                </div>
 
-            <div className="flex items-center justify-between py-2 border-t border-white/5">
-              <span className="text-[10px] font-mono text-white/40">ALL CAPS</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={config.useCaps} 
-                  onChange={(e) => updateConfig('useCaps', e.target.checked)}
-                  className="sr-only peer"
+                <GlassSlider 
+                    label="Size"
+                    min={20} max={300} step={10}
+                    value={config.fontSize}
+                    onChange={(e) => updateConfig('fontSize', parseFloat(e.target.value))}
+                    className="rounded-b-xl"
                 />
-                <div className="w-8 h-4 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-[10px] font-mono text-white/40">SCALE</span>
-              <input 
-                type="range" min="20" max="300" step="5"
-                value={config.fontSize}
-                onChange={(e) => updateConfig('fontSize', parseFloat(e.target.value))}
-                className="w-32 accent-pink-500 h-1 bg-white/10 appearance-none rounded-full"
-              />
             </div>
           </div>
 
-          {/* Reaction Diffusion Patterns */}
-          <div className="space-y-3">
-            <label className="text-[10px] tracking-widest text-cyan-400 font-bold block mb-2 border-b border-white/10 pb-1">REACTION PATTERN</label>
+          {/* Simulation Section */}
+          <div className="space-y-2">
+            <label className="text-[9px] tracking-wider text-white/40 font-bold uppercase block px-1">Simulation</label>
             
-            <div className="grid grid-cols-2 gap-2">
-              {RD_PRESETS.map((preset) => (
-                <button
-                  key={preset.name}
-                  onClick={() => applyPreset(preset)}
-                  className={`text-[10px] font-mono py-2 border transition-all duration-200 
-                    ${config.presetName === preset.name
-                      ? 'bg-cyan-400/20 border-cyan-400 text-cyan-200' 
-                      : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5 hover:text-white'}`}
-                >
-                  {preset.name}
-                </button>
-              ))}
-            </div>
+            <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+                {/* Presets */}
+                <div className="p-1.5 border-b border-white/5 flex flex-wrap gap-1">
+                  {RD_PRESETS.map((preset) => {
+                    const isActive = Math.abs(config.feed - preset.feed) < 0.001 && Math.abs(config.kill - preset.kill) < 0.001;
+                    return (
+                        <button
+                        key={preset.name}
+                        onClick={() => applyPreset(preset)}
+                        className={`flex-1 min-w-[30%] text-[9px] font-medium py-1 rounded-md transition-all duration-200 
+                            ${isActive ? 'bg-white text-black shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                        >
+                        {preset.name}
+                        </button>
+                    );
+                  })}
+                </div>
 
-            {/* Fine Tuning */}
-            <div className="pt-4 space-y-4 border-t border-white/5 mt-4">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center text-[9px] text-cyan-200/70 font-mono">
-                  <span>GROWTH (FEED)</span>
-                  <span className="bg-white/5 px-1.5 py-0.5 rounded">{config.feed.toFixed(4)}</span>
+                <div className="divide-y divide-white/5">
+                    <GlassSlider 
+                        label="Feed Rate"
+                        min={0.0100} max={0.1000} step={0.0005}
+                        value={config.feed}
+                        displayValue={config.feed.toFixed(4)}
+                        onChange={(e) => updateConfig('feed', parseFloat(e.target.value))}
+                        withTicks
+                    />
+                    <GlassSlider 
+                        label="Kill Rate"
+                        min={0.0450} max={0.0700} step={0.0005}
+                        value={config.kill}
+                        displayValue={config.kill.toFixed(4)}
+                        onChange={(e) => updateConfig('kill', parseFloat(e.target.value))}
+                        withTicks
+                    />
+                    <GlassSlider 
+                        label="Flow Speed"
+                        min={0.1} max={1.0} step={0.1}
+                        value={config.speed}
+                        displayValue={config.speed.toFixed(1)}
+                        onChange={(e) => updateConfig('speed', parseFloat(e.target.value))}
+                        withTicks
+                    />
                 </div>
-                <input 
-                  type="range" 
-                  min="0.0100" 
-                  max="0.1000" 
-                  step="0.0001"
-                  value={config.feed}
-                  onChange={(e) => updateConfig('feed', parseFloat(e.target.value))}
-                  className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
-                />
-              </div>
-              
-               <div className="space-y-2">
-                <div className="flex justify-between items-center text-[9px] text-cyan-200/70 font-mono">
-                  <span>DECAY (KILL)</span>
-                  <span className="bg-white/5 px-1.5 py-0.5 rounded">{config.kill.toFixed(4)}</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="0.0450" 
-                  max="0.0700" 
-                  step="0.0001"
-                  value={config.kill}
-                  onChange={(e) => updateConfig('kill', parseFloat(e.target.value))}
-                  className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
-                />
-              </div>
-              
-              {/* Sim Speed - Restricted to 1.0 */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center text-[9px] text-cyan-200/70 font-mono">
-                  <span>SIM SPEED</span>
-                  <span className="bg-white/5 px-1.5 py-0.5 rounded">{config.speed.toFixed(1)}</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="0.1" 
-                  max="1.0" 
-                  step="0.1"
-                  value={config.speed}
-                  onChange={(e) => updateConfig('speed', parseFloat(e.target.value))}
-                  className="w-full accent-cyan-400 h-1 bg-white/10 appearance-none rounded-full cursor-pointer"
-                />
-              </div>
             </div>
           </div>
 
-          {/* Aesthetics */}
-          <div className="space-y-3">
-            <label className="text-[10px] tracking-widest text-yellow-400 font-bold block mb-2 border-b border-white/10 pb-1">AESTHETICS</label>
+          {/* Aesthetics Section */}
+          <div className="space-y-2">
+            <label className="text-[9px] tracking-wider text-white/40 font-bold uppercase block px-1">Aesthetics</label>
             
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] text-white/40 font-mono">
-                <span>DEPTH</span>
-                <span>{config.displacementScale.toFixed(1)}</span>
-              </div>
-              <input 
-                type="range" min="0" max="3" step="0.1"
-                value={config.displacementScale}
-                onChange={(e) => updateConfig('displacementScale', parseFloat(e.target.value))}
-                className="w-full accent-yellow-400 h-1 bg-white/10 appearance-none rounded-full"
-              />
+            <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden divide-y divide-white/5">
+                <GlassSlider 
+                    label="Depth"
+                    min={0} max={3} step={0.1}
+                    value={config.displacementScale}
+                    onChange={(e) => updateConfig('displacementScale', parseFloat(e.target.value))}
+                />
+                 <GlassSlider 
+                    label="Bloom"
+                    min={0} max={4} step={0.5}
+                    value={config.bloomIntensity}
+                    onChange={(e) => updateConfig('bloomIntensity', parseFloat(e.target.value))}
+                    withTicks
+                />
+                 <GlassSlider 
+                    label="Chromatic"
+                    min={0} max={0.02} step={0.001}
+                    value={config.aberration}
+                    displayValue={(config.aberration * 100).toFixed(1)}
+                    onChange={(e) => updateConfig('aberration', parseFloat(e.target.value))}
+                />
+                 <GlassSlider 
+                    label="Grain"
+                    min={0} max={0.3} step={0.05}
+                    value={config.noise}
+                    onChange={(e) => updateConfig('noise', parseFloat(e.target.value))}
+                    withTicks
+                />
             </div>
 
-             <div className="space-y-2">
-              <div className="flex justify-between text-[10px] text-white/40 font-mono">
-                <span>GLOW</span>
-                <span>{config.bloomIntensity.toFixed(1)}</span>
-              </div>
-              <input 
-                type="range" min="0" max="4" step="0.1"
-                value={config.bloomIntensity}
-                onChange={(e) => updateConfig('bloomIntensity', parseFloat(e.target.value))}
-                className="w-full accent-yellow-400 h-1 bg-white/10 appearance-none rounded-full"
-              />
-            </div>
-
-            {/* Creative Options: Aberration & Noise */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] text-white/40 font-mono">
-                <span>RGB SHIFT</span>
-                <span>{(config.aberration * 100).toFixed(1)}</span>
-              </div>
-              <input 
-                type="range" min="0" max="0.02" step="0.0005"
-                value={config.aberration}
-                onChange={(e) => updateConfig('aberration', parseFloat(e.target.value))}
-                className="w-full accent-yellow-400 h-1 bg-white/10 appearance-none rounded-full"
-              />
-            </div>
-            
-             <div className="space-y-2">
-              <div className="flex justify-between text-[10px] text-white/40 font-mono">
-                <span>NOISE GRAIN</span>
-                <span>{config.noise.toFixed(2)}</span>
-              </div>
-              <input 
-                type="range" min="0" max="0.3" step="0.01"
-                value={config.noise}
-                onChange={(e) => updateConfig('noise', parseFloat(e.target.value))}
-                className="w-full accent-yellow-400 h-1 bg-white/10 appearance-none rounded-full"
-              />
-            </div>
-
-            {/* Custom Color Pickers */}
-            <div className="grid grid-cols-1 gap-1 pt-2">
+            <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden divide-y divide-white/5 mt-2">
               <ColorPicker 
-                label="PRIMARY" 
+                label="Primary" 
                 color={config.color1} 
                 onChange={(c) => updateConfig('color1', c)} 
                 isOpen={activePicker === 'color1'}
                 onToggle={() => togglePicker('color1')}
               />
               <ColorPicker 
-                label="SECONDARY" 
+                label="Secondary" 
                 color={config.color2} 
                 onChange={(c) => updateConfig('color2', c)} 
                 isOpen={activePicker === 'color2'}
                 onToggle={() => togglePicker('color2')}
               />
               <ColorPicker 
-                label="BACKGROUND" 
+                label="Background" 
                 color={config.backgroundColor} 
                 onChange={(c) => updateConfig('backgroundColor', c)} 
                 isOpen={activePicker === 'bg'}
@@ -488,50 +607,40 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
           </div>
 
           {/* Export Section */}
-          <div className="space-y-3">
-             <label className="text-[10px] tracking-widest text-emerald-400 font-bold block mb-2 border-b border-white/10 pb-1">EXPORT</label>
+          <div className="space-y-2 pt-2">
              <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={handleSnapshot}
-                  className="text-[10px] font-mono py-3 border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-white transition-colors"
+                  className="text-[9px] font-bold py-2.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/20 text-white/80 transition-all uppercase tracking-wider"
                 >
-                  SAVE IMAGE
+                  Snapshot
                 </button>
                  <button 
                   onClick={toggleRecording}
-                  className={`text-[10px] font-mono py-3 border transition-colors flex items-center justify-center gap-2
+                  className={`text-[9px] font-bold py-2.5 rounded-lg border transition-all flex items-center justify-center gap-2 uppercase tracking-wider
                     ${isRecording 
-                        ? 'border-red-500 bg-red-500 text-white animate-pulse' 
-                        : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-white'}`}
+                        ? 'border-red-500/50 bg-red-500/20 text-red-200 animate-pulse' 
+                        : 'border-white/10 bg-white/5 hover:bg-white/20 text-white/80'}`}
                 >
                   {isRecording ? (
-                      <>
-                      <span className="w-2 h-2 bg-white rounded-full"></span>
-                      STOP VIDEO
-                      </>
-                  ) : 'RECORD VIDEO'}
+                      <><div className="w-1.5 h-1.5 bg-red-400 rounded-full animate-ping"/> REC</>
+                  ) : 'Record'}
                 </button>
              </div>
-             <p className="text-[9px] text-white/30 font-mono leading-tight">
-                Images saved as PNG. Video includes audio (WebM/MP4).
-             </p>
           </div>
 
-          {/* Actions */}
-          <div className="pt-4 border-t border-white/10 flex gap-2">
-               <button 
-                onClick={() => setText("")}
-                className="flex-1 text-[10px] font-bold tracking-wider font-mono bg-red-500/10 border border-red-500/30 py-2 hover:bg-red-500/20 text-red-300 transition-colors"
-               >
-                 CLEAR CANVAS
-               </button>
-          </div>
+          <button 
+            onClick={() => setText("")}
+            className="w-full mt-1 text-[9px] font-bold tracking-widest uppercase bg-red-500/5 border border-red-500/20 rounded-lg py-3 hover:bg-red-500/20 text-red-400/80 transition-colors"
+           >
+             Reset Canvas
+           </button>
        </div>
 
        {/* Footer Credit */}
-       <div className="pt-6 pb-2 text-center border-t border-white/5 mt-4">
-          <p className="text-[9px] text-white/30 font-mono">
-            Made by <a href="https://bykins.com" target="_blank" rel="noreferrer" className="text-white/50 hover:text-white underline decoration-white/30 transition-colors">kins</a>
+       <div className="pt-3 pb-1 text-center border-t border-white/10">
+          <p className="text-[9px] text-white/30 font-sans">
+            Designed by <a href="https://bykins.com" target="_blank" rel="noreferrer" className="text-white/50 hover:text-white transition-colors">kins</a>
           </p>
        </div>
     </div>
@@ -543,17 +652,16 @@ interface OverlayProps {
   setText: (t: string | ((prev: string) => string)) => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (v: boolean) => void;
-  config: AppConfig;
 }
 
-export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen, config }) => {
+export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen }) => {
   const [started, setStarted] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle typing
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newVal = e.target.value;
-    if (newVal.length > 60) return; 
+    if (newVal.length > 100) return; 
     
     const isDelete = newVal.length < text.length;
     const isAdd = newVal.length > text.length;
@@ -572,8 +680,6 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
   const handleStart = async () => {
     if (!started) {
         await audioSynth.init();
-        // Apply current preset sound on start
-        if (config.presetName) audioSynth.setProfile(config.presetName);
         setStarted(true);
         if (inputRef.current) {
             inputRef.current.focus();
@@ -602,13 +708,14 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [started, setText, config.presetName]);
+  }, [started, setText]);
 
   const handleGlobalClick = (e: React.MouseEvent) => {
-    // Avoid triggering on UI controls
     if ((e.target as HTMLElement).closest('button')) return;
     if ((e.target as HTMLElement).closest('input')) return;
-    if ((e.target as HTMLElement).closest('select')) return;
+    if ((e.target as HTMLElement).closest('div[class*="bg-white/5"]')) return;
+    if ((e.target as HTMLElement).closest('aside')) return;
+    if ((e.target as HTMLElement).closest('.prevent-click')) return;
     
     if (!started) {
       handleStart();
@@ -619,7 +726,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
 
   return (
     <div 
-      className="absolute inset-0 z-10 flex flex-col justify-between p-4 md:p-8 transition-colors cursor-text pointer-events-auto"
+      className="absolute inset-0 z-10 flex flex-col cursor-text"
       onClick={handleGlobalClick}
     >
       <textarea
@@ -630,35 +737,64 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
         autoFocus={started}
       />
 
-      {/* Top Bar */}
-      <div className="flex justify-end w-full pointer-events-none">
-        <div className="pointer-events-auto">
+      {/* UI Controls Container - Pointer events only for buttons */}
+      <div className="flex-1 flex flex-col justify-between p-4 md:p-6 pointer-events-none relative z-20">
+          
+          {/* Top Left: Desktop Config Trigger */}
+          <div className="flex justify-start">
+             <div className="pointer-events-auto hidden md:block">
+                {!isSettingsOpen && (
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsSettingsOpen(true);
+                        }}
+                        className="text-[10px] font-bold tracking-wider text-white/60 hover:text-white border border-white/10 bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors uppercase"
+                    >
+                        Config
+                    </button>
+                )}
+             </div>
+          </div>
+
+          {/* Bottom Center: Mobile Hamburger Trigger */}
+          <div className="flex justify-center">
+             <div className="pointer-events-auto md:hidden pb-4">
+                {!isSettingsOpen && (
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsSettingsOpen(true);
+                        }}
+                        className="p-4 rounded-full bg-zinc-900/50 border border-white/10 backdrop-blur-xl text-white hover:bg-zinc-800 transition-all active:scale-95 shadow-lg"
+                    >
+                         <div className="space-y-1.5">
+                           <div className="w-6 h-0.5 bg-white/80 rounded-full shadow-sm"></div>
+                           <div className="w-6 h-0.5 bg-white/80 rounded-full shadow-sm"></div>
+                           <div className="w-6 h-0.5 bg-white/80 rounded-full shadow-sm"></div>
+                        </div>
+                    </button>
+                )}
+             </div>
+          </div>
+      </div>
+
+      {/* Center Start Button (Overlay) */}
+      {!started && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/60 backdrop-blur-sm transition-opacity duration-700 z-50">
           <button 
+            className="prevent-click group pointer-events-auto px-6 py-3 rounded-lg border border-white/20 bg-black/50 hover:bg-white/10 backdrop-blur-md transition-all duration-300 ease-out hover:scale-105 hover:border-white/40"
             onClick={(e) => {
-                e.stopPropagation();
-                setIsSettingsOpen(!isSettingsOpen);
+              e.stopPropagation();
+              handleStart();
             }}
-            className="text-xs font-mono text-white/60 hover:text-white border border-white/20 px-3 py-1 rounded hover:bg-white/10 transition-colors uppercase"
           >
-            {isSettingsOpen ? 'HIDE SETTINGS' : 'SETTINGS'}
+             <span className="font-sans text-xs font-bold text-white/90 tracking-[0.2em] uppercase group-hover:text-white transition-colors">
+               Click to Begin
+             </span>
           </button>
         </div>
-      </div>
-
-      {/* Center Start Button (Visual Only) */}
-      {!started && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90 transition-opacity duration-700 z-50" onClick={handleGlobalClick}>
-          <div className="group relative p-12 cursor-pointer">
-             <span className="font-mono text-sm md:text-base text-white/70 tracking-widest lowercase group-hover:text-white transition-colors duration-500 ease-out block">
-               click to begin
-             </span>
-             <span className="absolute bottom-10 left-1/2 -translate-x-1/2 h-[1px] bg-white/40 w-12 transition-all duration-500 ease-out"></span>
-          </div>
-        </div>
       )}
-
-      <div className="w-full flex justify-center pointer-events-none pb-8">
-      </div>
     </div>
   );
 };
