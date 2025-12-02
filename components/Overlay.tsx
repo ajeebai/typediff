@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { audioSynth } from '../services/AudioSynth';
 import { AppConfig } from '../types';
@@ -100,6 +99,21 @@ const hexToHsv = (hex: string) => {
 };
 
 // -- UI Components --
+
+const GlassToggle: React.FC<{
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}> = ({ label, value, onChange }) => {
+  return (
+    <div className="py-2 px-4 flex items-center justify-between hover:bg-white/5 transition-colors cursor-pointer" onClick={() => onChange(!value)}>
+       <span className="text-[9px] font-bold tracking-widest text-white/60 uppercase">{label}</span>
+       <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${value ? 'bg-blue-500/50' : 'bg-white/10'}`}>
+          <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform duration-300 ${value ? 'left-4.5 translate-x-0' : 'left-0.5'}`} style={{ left: value ? '1.125rem' : '0.125rem' }}/>
+       </div>
+    </div>
+  );
+};
 
 const GlassSlider: React.FC<{
   label: string;
@@ -606,6 +620,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig,
             </div>
           </div>
 
+           {/* View Control */}
+           <div className="space-y-2">
+            <label className="text-[9px] tracking-wider text-white/40 font-bold uppercase block px-1">Control</label>
+            <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+                <GlassToggle 
+                    label="Free Roam (3D)" 
+                    value={config.freeRoam} 
+                    onChange={(v) => updateConfig('freeRoam', v)} 
+                />
+            </div>
+          </div>
+
           {/* Export Section */}
           <div className="space-y-2 pt-2">
              <div className="grid grid-cols-2 gap-2">
@@ -654,9 +680,11 @@ interface OverlayProps {
   setIsSettingsOpen: (v: boolean) => void;
   hasStarted: boolean;
   onStart: () => void;
+  config: AppConfig;
+  setConfig: (c: AppConfig) => void;
 }
 
-export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen, hasStarted, onStart }) => {
+export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen, setIsSettingsOpen, hasStarted, onStart, config, setConfig }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [hasTyped, setHasTyped] = useState(false);
 
@@ -696,19 +724,21 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
   };
 
   useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+    const handleGlobalKeyDown = async (e: KeyboardEvent) => {
+      // Ignore meta keys
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      
+      // If already started and focus is not on input (e.g. clicked away)
       if (hasStarted) {
-        if (document.activeElement !== inputRef.current && inputRef.current) {
+        if (document.activeElement !== inputRef.current && inputRef.current && !config.freeRoam) {
            inputRef.current.focus();
         }
         return;
       }
 
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      
-      handleStart();
-      
-      if (e.key.length === 1) {
+      // If NOT started, any valid key starts the app
+      if (!hasStarted && e.key.length === 1) {
+          await handleStart();
           setText((prev) => prev + e.key);
           audioSynth.triggerNote(e.key.charCodeAt(0));
       }
@@ -716,41 +746,69 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [hasStarted, setText]);
+  }, [hasStarted, setText, config.freeRoam]);
 
   const handleGlobalClick = (e: React.MouseEvent) => {
+    // Only handle clicks if they aren't on interactive elements
     if ((e.target as HTMLElement).closest('button')) return;
     if ((e.target as HTMLElement).closest('input')) return;
     if ((e.target as HTMLElement).closest('div[class*="bg-white/5"]')) return;
     if ((e.target as HTMLElement).closest('aside')) return;
     if ((e.target as HTMLElement).closest('.prevent-click')) return;
     
-    if (!hasStarted) {
-      handleStart();
-    } else if (inputRef.current) {
+    if (inputRef.current && !config.freeRoam) {
       inputRef.current.focus();
     }
   };
 
   return (
-    <div 
-      className="absolute inset-0 z-10 flex flex-col cursor-text"
-      onClick={handleGlobalClick}
-    >
-      <textarea
-        ref={inputRef}
-        value={text}
-        onChange={handleChange}
-        className="opacity-0 fixed top-0 left-0 pointer-events-none w-0 h-0 resize-none overflow-hidden"
-        autoFocus={hasStarted}
-      />
+    <div className="absolute inset-0 z-10 flex flex-col pointer-events-none">
+      {/* 
+         Visible Textarea Overlay 
+         This provides the "Caret" and ensures typing works naturally.
+         It's invisible (transparent text) but shows caret.
+         Disabled in Free Roam to prevent camera interaction conflict.
+      */}
+      {!config.freeRoam && (
+        <textarea
+            ref={inputRef}
+            value={text}
+            onChange={handleChange}
+            spellCheck={false}
+            className="fixed inset-0 w-full h-full bg-transparent outline-none border-none resize-none overflow-hidden text-center pointer-events-auto"
+            style={{ 
+                color: 'transparent', 
+                caretColor: 'white',
+                fontFamily: config.fontFamily,
+                fontSize: `${config.fontSize}px`,
+                // Approximate vertical centering
+                paddingTop: '45vh',
+                lineHeight: 1.2
+            }}
+            autoFocus={hasStarted}
+            onClick={handleGlobalClick}
+        />
+      )}
+      
+      {/* Fallback hidden input for Free Roam mode to capture keys if needed, 
+          though typically Free Roam disables typing focus to allow controls. 
+          But if user wants to type in free roam, they can toggle back.
+      */}
+      {config.freeRoam && (
+         <textarea
+            ref={inputRef}
+            value={text}
+            onChange={handleChange}
+            className="opacity-0 fixed top-0 left-0 pointer-events-none w-0 h-0"
+         />
+      )}
 
-      {/* UI Controls Container - Pointer events only for buttons */}
-      <div className="flex-1 flex flex-col justify-between p-4 md:p-6 pointer-events-none relative z-20">
+      {/* UI Controls Container */}
+      <div className="flex-1 flex flex-col justify-between p-4 md:p-6 relative z-20 pointer-events-none">
           
-          {/* Top Left: Desktop Config Trigger */}
-          <div className="flex justify-start">
-             <div className="pointer-events-auto hidden md:block">
+          {/* Top Left: Desktop Config & Free Roam Toggle */}
+          <div className="flex justify-start gap-2">
+             <div className="pointer-events-auto hidden md:flex gap-2">
                 {!isSettingsOpen && hasStarted && (
                     <button 
                         onClick={(e) => {
@@ -762,56 +820,71 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
                         Config
                     </button>
                 )}
+                 {hasStarted && (
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setConfig({...config, freeRoam: !config.freeRoam});
+                        }}
+                        className={`text-[10px] font-bold tracking-wider border border-white/10 backdrop-blur-md px-3 py-1.5 rounded-lg transition-colors uppercase flex items-center gap-2
+                             ${config.freeRoam ? 'bg-blue-500/20 text-blue-200 border-blue-500/30' : 'bg-black/20 text-white/60 hover:text-white hover:bg-white/10'}`}
+                    >
+                       <span>{config.freeRoam ? 'Free Roam' : 'Fixed Cam'}</span>
+                    </button>
+                 )}
              </div>
           </div>
-
       </div>
 
-      {/* Mobile Floating Toggle Button (Fixed Position to sit on top of Bottom Sheet) */}
-      <div className="pointer-events-auto md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-[60]">
+      {/* Mobile Floating Toggle Button */}
+      <div className="pointer-events-auto md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] flex gap-2">
           {hasStarted && (
+            <>
+            <button 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setConfig({...config, freeRoam: !config.freeRoam});
+                }}
+                className={`p-3 rounded-full border backdrop-blur-xl transition-all active:scale-95 shadow-lg
+                     ${config.freeRoam ? 'bg-blue-600/50 border-blue-400/30 text-white' : 'bg-black/50 border-white/10 text-white/70'}`}
+            >
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            </button>
             <button 
                 onClick={(e) => {
                     e.stopPropagation();
                     setIsSettingsOpen(!isSettingsOpen);
                 }}
                 className="p-3 rounded-full bg-black/50 border border-white/10 backdrop-blur-xl text-white hover:bg-zinc-800 transition-all active:scale-95 shadow-lg"
-                aria-label="Toggle Settings"
             >
                   <div className="w-5 h-5 relative flex items-center justify-center">
-                    {/* Hamburger / Cross Transition */}
                     <span className={`absolute h-0.5 w-5 bg-white/90 rounded-full transition-all duration-300 ease-in-out ${isSettingsOpen ? 'rotate-45 translate-y-0' : '-translate-y-1.5'}`} />
                     <span className={`absolute h-0.5 w-5 bg-white/90 rounded-full transition-all duration-300 ease-in-out ${isSettingsOpen ? 'opacity-0' : 'opacity-100'}`} />
                     <span className={`absolute h-0.5 w-5 bg-white/90 rounded-full transition-all duration-300 ease-in-out ${isSettingsOpen ? '-rotate-45 translate-y-0' : 'translate-y-1.5'}`} />
                   </div>
             </button>
+            </>
           )}
       </div>
 
-      {/* Typing Hint */}
+      {/* Start Hint Text */}
+      {!hasStarted && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 transition-opacity duration-700">
+           <div className="text-center animate-pulse">
+             <span className="font-sans text-sm font-medium text-white/50 tracking-[0.4em] uppercase drop-shadow-md">
+               Type to Begin
+             </span>
+           </div>
+        </div>
+      )}
+      
+      {/* Typing Hint (after start but empty) */}
       {hasStarted && text.length === 0 && !hasTyped && (
-         <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-1000">
+         <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-1000 z-10">
             <span className="text-white/30 font-sans text-xs tracking-[0.3em] uppercase animate-pulse">
-                Start Typing
+                Type something...
             </span>
          </div>
-      )}
-
-      {/* Center Start Button (Overlay) */}
-      {!hasStarted && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/80 backdrop-blur-md transition-opacity duration-700 z-50">
-          <button 
-            className="prevent-click group pointer-events-auto relative px-8 py-3 rounded-full bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.25),0_8px_32px_rgba(0,0,0,0.5)] hover:bg-white/10 transition-all duration-500 ease-out hover:scale-105 hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.4),0_12px_40px_rgba(0,0,0,0.6)]"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleStart();
-            }}
-          >
-             <span className="font-sans text-sm font-medium text-white/90 tracking-widest group-hover:text-white transition-colors drop-shadow-md uppercase">
-               Click to Begin
-             </span>
-          </button>
-        </div>
       )}
     </div>
   );

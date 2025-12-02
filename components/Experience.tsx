@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { EffectComposer, DepthOfField, ChromaticAberration, Bloom, Noise } from '@react-three/postprocessing';
+import { OrbitControls } from '@react-three/drei';
 import { BlendFunction } from 'postprocessing';
 import * as THREE from 'three';
 import { ReactionDiffusion } from './ReactionDiffusion';
@@ -36,6 +37,20 @@ const Experience: React.FC<ExperienceProps> = ({ textInput, config, resetKey = 0
         <color attach="background" args={[config.backgroundColor]} />
         
         <ambientLight intensity={0.2} />
+
+        {config.freeRoam && (
+          <OrbitControls 
+            makeDefault 
+            enablePan={true}
+            enableZoom={true}
+            enableRotate={true}
+            minDistance={2}
+            maxDistance={15}
+            maxPolarAngle={Math.PI / 1.6}
+            enableDamping
+            dampingFactor={0.05}
+          />
+        )}
         
         <ReactionDiffusion key={resetKey} textInput={textInput} config={config} />
 

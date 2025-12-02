@@ -26,4 +26,5 @@ export interface AppConfig {
   fontFamily: string;
   fontSize: number;
   bloomIntensity: number;
+  freeRoam: boolean;
 }

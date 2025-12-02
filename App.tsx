@@ -1,4 +1,3 @@
-
 import React, { useState, Suspense } from 'react';
 import Experience from './components/Experience';
 import { Overlay, SettingsPanel } from './components/Overlay';
@@ -24,6 +23,7 @@ const App: React.FC = () => {
     fontFamily: 'MuseoModerno',
     fontSize: 40, 
     bloomIntensity: 1.2,
+    freeRoam: false,
   });
 
   const handleStart = () => {
@@ -83,6 +83,8 @@ const App: React.FC = () => {
             setIsSettingsOpen={setIsSettingsOpen}
             hasStarted={hasStarted}
             onStart={handleStart}
+            config={config}
+            setConfig={setConfig}
         />
       </div>
       
