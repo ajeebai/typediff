@@ -713,18 +713,23 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
   };
 
   // Handle initial start for audio context
-  const handleStart = async () => {
+  const handleStart = () => {
     if (!hasStarted) {
-        await audioSynth.init();
+        // Start audio context immediately without awaiting (async) to avoid UI lag
+        audioSynth.init().catch(console.error);
         onStart();
-        if (inputRef.current) {
-            inputRef.current.focus();
-        }
+        
+        // Attempt focus on next tick to ensure re-render
+        setTimeout(() => {
+            if (inputRef.current) {
+                inputRef.current.focus();
+            }
+        }, 0);
     }
   };
 
   useEffect(() => {
-    const handleGlobalKeyDown = async (e: KeyboardEvent) => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Ignore meta keys
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       
@@ -738,7 +743,7 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
 
       // If NOT started, any valid key starts the app
       if (!hasStarted && e.key.length === 1) {
-          await handleStart();
+          handleStart(); // Don't await here for seamless start
           setText((prev) => prev + e.key);
           audioSynth.triggerNote(e.key.charCodeAt(0));
       }
@@ -775,10 +780,9 @@ export const Overlay: React.FC<OverlayProps> = ({ text, setText, isSettingsOpen,
             value={text}
             onChange={handleChange}
             spellCheck={false}
-            className="fixed inset-0 w-full h-full bg-transparent outline-none border-none resize-none overflow-hidden text-center pointer-events-auto"
+            className="fixed inset-0 w-full h-full bg-transparent outline-none border-none resize-none overflow-hidden text-center pointer-events-auto hover:caret-transparent caret-white cursor-text"
             style={{ 
                 color: 'transparent', 
-                caretColor: 'white',
                 fontFamily: config.fontFamily,
                 fontSize: `${config.fontSize}px`,
                 // Approximate vertical centering
